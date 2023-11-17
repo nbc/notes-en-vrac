@@ -1,0 +1,458 @@
+---
+title: "parquet, arrow et duckdb"
+subtitle: "REX SDES"
+author: "CGDD - Nicolas Chuche"
+lang: fr
+format: 
+  revealjs:
+    slide-number: true
+execute:
+  eval: true
+  echo: true
+---
+
+```{r}
+#| include: false
+#| cache: false
+
+library(knitr)
+hook_output <- knit_hooks$get("output")
+knit_hooks$set(output = function(x, options) {
+  lines <- options$output.lines
+  if (is.null(lines)) {
+    return(hook_output(x, options))  # pass to default hook
+  }
+  x <- unlist(strsplit(x, "\n"))
+  more <- "..."
+  if (length(lines)==1) {        # first n lines
+    if (length(x) > lines) {
+      # truncate the output, but add ....
+      x <- c(head(x, lines), more)
+    }
+  } else {
+    x <- c(more, x[lines], more)
+  }
+  # paste these lines together
+  x <- paste(c(x, ""), collapse = "\n")
+  hook_output(x, options)
+})
+```
+
+## Les objectifs
+
+1. Proposer des solutions pour
+    * migrer les traitements SAS portant sur des données volumineuses
+    * permettre aux utilisateurs R d'éviter dans la mesure du possibles les contournements scabreux habituels (traitements par morceaux...)
+1. Introduire le format parquet
+1. Diminuer la volumétrie disque utilisée
+
+## Une stratégie différenciée
+
+* `arrow`/`duckdb` quand il y a besoin
+* `read_parquet()`/`write_parquet()` + `dplyr` sinon
+
+On ne cherche (surtout pas) à vendre `arrow`/`duckdb`  à tout le monde
+
+# Un projet en plusieurs étapes
+
+## Un travail amont conséquent
+
+* prise en main de `arrow` et `duckdb`
+* étude de cas réels avec "benchmark"
+
+## Du teasing
+
+* Présentation des gains constatés sur les cas réels à différents agents "prescripteurs"
+
+## Des présentations à plusieurs niveaux
+
+Au niveau du CODIR SDES élargi :
+
+* présentation de très haut niveau sur parquet, `arrow` et `duckdb`
+* quelques exemples simples avant/après avec benchmark
+
+## Des présentations à plusieurs niveaux
+
+Au niveau des sous-directions pour tous les agents intéressés :
+
+* un point plus complet et opérationnel sur parquet et les fonctions arrow `read_parquet()`/`write_parquet()`
+* quelques comparaisons avec les outils actuels
+* des exemples `arrow`/`duckdb` plus poussés sur les courses de taxi new yorkais
+* et sur des exemples réels du SDES
+
+## Un GT dédié aux utilisateurs de données massives
+
+Concerne une 10aine d'agents.
+
+1. présentation en profondeur des outils `arrow`/`duckdb`
+1. des cas pratiques
+1. travail sur les sources à convertir (priorités, partition...)
+
+## Un accompagnement
+
+Un accompagnement spécifique au quotidien des utilisateurs de données massives sur :
+
+* leur code
+* une aide à la conversion de leurs fichiers
+
+(à élargir dans un deuxième temps et au fur et à mesure des capacités)
+
+Et en parallèle, un site avec de la documentation, la présentation de l'ensemble
+des cas pratiques, une FAQ...
+
+# Un premier bilan
+
+## Des retours très positifs
+
+* à la fois des utilisateurs R mais aussi des selfeurs, séduits par les performances.
+* plusieurs selfeurs réticents sur R deviennent demandeurs.
+* plusieurs traitements (R) en cours de conversion vers ces nouveaux outils.
+
+Ces outils lèvent un point de blocage important de la migration SAS vers R
+
+## Des difficultés, pour les utilisateurs
+
+* tout le `tidyverse` n'est pas implémenté. Il faut parfois contourner [avec l'existant](https://arrow.apache.org/docs/dev/r/reference/acero.html)
+* certains utilisateurs ont du mal à comprendre l'articulation entre l'existant, `arrow`, `duckdb` et `dbplyr`
+* `arrow`/`duckdb` peuvent planter avec des messages laconiques en cas de manque mémoire
+
+## Des difficultés, pour les utilisateurs (2)
+
+"ça marchait avant", `dplyr` est plus laxiste que `arrow`/`dbplyr`/`duckdb` :
+
+* permet l'addition de booléens
+* permet de mixer avec R base
+* autorise des expressions rationnelles invalides (`[:punct:]` à la place de `[[:punct:]]`)
+* ...
+
+## Des difficultés, pour les utilisateurs (3)
+
+Une conversion plus ou moins difficile suivant les packages utilisés :
+
+1. dplyr "pur"
+1. dplyr + r-base
+1. data.table
+
+## Et pour les admins
+
+* par défaut, `arrow` et `duckdb` satureront les CPU sur certaines actions :
+    * `arrow::set_cpu_count(N)` (à ajouter dans le Rprofile général ?)
+    * directives `threads` dans `duckdb` (doit être ajouté par les utilisateurs)
+* certains utilisateurs font des traitements csv -> rds -> parquet... et gardent tous les fichiers intermédiaires.
+
+## Conversion des fichiers SAS
+
+* les utilisateurs sont généralement autonomes pour les "petits" fichiers avec les packages R
+* pour les gros fichiers SAS : [readstat](https://github.com/curtisalexander/readstat-rs) est votre ami
+
+Ne sous-estimez pas le temps de conversion (1,5 mois pour convertir les 2To de
+POTE en 0,2Go de fichiers parquet)
+
+## Et maintenant
+
+* Des débuts encourageants
+* Encore beaucoup de travail à prévoir pour :
+    * continuer l'accompagnement et la montée en compétence des agents
+    * couvrir de nouveaux cas pratiques
+    * étudier les possibilités de traitement sur les données géographiques, sur les bases postgres...
+
+# Quelques conseils en vrac
+
+## On charge quelque packages et variables
+
+```{r setup}
+#| output: false
+#| cache: false
+#| eval: true
+library(tidyverse)
+library(arrow)
+library(duckdb)
+
+taxi_dir <- "/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi"
+```
+
+```{r}
+#| echo: false
+#| output: false
+if (!file.exists(taxi_dir)) {
+  taxi_dir <- "/home/nc/travail/R/Rexploration/rdata/nyc-taxi/"
+}
+```
+
+## Fixez des limites
+
+Avec `duckdb`, n'utilisez pas de base de données en mémoire et fixer des limites mémoire et CPU :
+
+```{r connect}
+#| eval: true
+con <- DBI::dbConnect(duckdb(), 
+                      dbdir = "ma_base.db", 
+                      config=list(
+                        "memory_limit"="20GB", 
+                        threads = "4")
+                      )
+```
+
+Vos traitements passeront sur disques en cas de dépassement du seuil fixé
+(attention à l'impact sur les performances).
+
+Avec `arrow`, fixez le nombre de CPU :
+
+```{r set_cpu}
+arrow::set_cpu_count(4)
+```
+
+## Vous pouvez utiliser `duckdb` avec `arrow`
+
+```{r to_duckdb_1}
+#| error: true
+open_dataset(taxi_dir) |> filter(year == 2018 & month == 1) |>
+  filter(trip_distance == max(trip_distance, na.rm = TRUE)) |>
+  collect()
+```
+
+
+```{r to_duckdb_2, output.lines = 4}
+#| cache: true
+open_dataset(taxi_dir) |> filter(year == 2018 & month == 1) |>
+  to_duckdb() |>
+  filter(trip_distance == max(trip_distance, na.rm = TRUE)) |>
+  collect()
+```
+
+## Evitez de mixer `arrow` et `duckdb`
+
+Utilisez : 
+
+```{r arrow_duckdb_1}
+#| output: false
+tbl(con, glue::glue("read_parquet('{taxi_dir}/**/*.parquet')"))
+```
+
+Plutôt que :
+
+```{r arrow_duckdb_2}
+#| output: false
+arrow::open_dataset(taxi_dir) |>
+    to_duckdb()
+```
+
+Les deux marcheront, en temps normal, mais le second allouera de la mémoire à
+`arrow` ET à `duckdb`.
+
+## Vous pouvez passer de `duckdb` à `dbplyr`
+
+Et ça peut être utile/lisible :
+
+```{r duckdb_2_dbplyr}
+#| output: false
+dbExecute(con, glue::glue("CREATE OR REPLACE VIEW courses_taxi AS 
+                SELECT * FROM '{taxi_dir}/**/*.parquet'"))
+
+tbl(con, "courses_taxi") |>
+  filter(year == 2016, month == 1) |>
+  summarize(trip_distance = mean(trip_distance)) |>
+  collect()
+```
+
+## Et de `dbplyr` à `duckdb`
+
+Mais il faut passer par un "stockage" intermédiaire.
+
+Soit une "vraie" table :
+
+```{r dbplyr_2_duckdb}
+request <- tbl(con, "courses_taxi") |>
+  filter(year == 2016, month == 1) |>
+  summarize(trip_distance = mean(trip_distance))
+
+copy_to(con, request, "request")
+```
+
+* `copy_to()` sait utiliser une requête `dbplyr` pour peupler une table.
+* copie réellement les données en base
+
+## Et de `dbplyr` à `duckdb` (2)
+
+Soit une vue, en réutilisant le SQL généré ci-dessus :
+
+```{r dbplyr_2_duckdb_2}
+sql <- request |> dbplyr::sql_render(con = con) |> DBI::SQL()
+sql 
+
+dbExecute(con, glue::glue("CREATE OR REPLACE VIEW ma_vue AS {sql}"))
+tbl(con, "ma_vue")
+```
+
+* ne copie pas de données mais temps de traitement potentiellement plus long
+
+## `dbplyr` et les fonctions `duckdb`
+
+`dbplyr` transmet les fonctions qu'il ne comprends pas à la base :
+
+```{r dbplyr_sql_1}
+#| echo: false
+#| output: false
+#| cache: false
+#| eval: true
+tb = tibble(
+  adresse = c('1, RUE DE BERCY, 92500 Paris', '3 rue de bagnolet. 93000 Montreuil'),
+  nom_de_fichier = c('fichier_1993.csv', 'nom_de_fichier_2003.csv'),
+  date = ymd(c("2023-09-10"), "2019-03-05")
+)
+
+con <- DBI::dbConnect(duckdb())
+
+duckdb_register(con, "une_table", tb, overwrite = TRUE)
+```
+
+
+```{r dbplyr_sql_2}
+#| cache: false
+result <- tbl(con, "une_table") |>
+  mutate(
+    # [^a-z0-9 ] indique tous les caractères SAUF ceux cités (et ceux entre les deux bornes)
+    # le 'g' final indique que le replacement doit être global
+    adresse = REGEXP_REPLACE(LOWER(adresse), '[^a-z0-9 ]+', '', 'g'),
+    # on peut mixer les fonctions dplyr avec les fonctions de duckdb
+    annee_extraite = as.integer(REGEXP_EXTRACT(nom_de_fichier, '([0-9]+)')),
+    premier_janvier = MAKE_DATE(annee_extraite, 1L, 1L),
+    premier_du_mois = DATE_TRUNC('month', date)
+  )
+```
+
+## `dbplyr` et les fonctions `duckdb` (2)
+
+```{r dbplyr_sql_3}
+tbl(con, "une_table")
+```
+
+```{r dbplyr_sql_4, output.lines = 5}
+result |>
+  select(-c("nom_de_fichier", "date")) |>
+  collect()
+```
+
+## `dbplyr` et les fonctions `duckdb` (3)
+
+Cette fonctionnalité permet de réutiliser directement l'ensemble des fonctions
+intégrées à `duckdb` :
+
+* [les fonctions de chaines de caractères](https://duckdb.org/docs/sql/functions/char.html)
+* [les fonctions de calcul sur les dates](https://duckdb.org/docs/sql/functions/date)
+* [les fonctions d'extraction d'élements de dates](https://duckdb.org/docs/sql/functions/datepart)
+* [les fonctions de "pattern matching"](https://duckdb.org/docs/sql/functions/patternmatching)
+* ...
+
+## Générer des fichiers intermédiaires (volumineux)
+
+Beaucoup de méthodes possibles, mais plusieurs ne sont pas optimisées.
+
+## Générer des fichiers intermédiaires (1)
+
+En utilisant `arrow::to_arrow()` pour passer la requête de `dbplyr`à `arrow` :
+
+```{r intermediaire_1}
+#| cache: true
+tbl(con, glue::glue("read_parquet('{taxi_dir}/**/*.parquet')")) |>
+  filter(year == 2016, month == 1) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  to_arrow() |>
+  write_dataset(tempfile())
+```
+
+## Générer des fichiers intermédiaires (2)
+
+En utilisant uniquement `arrow` :
+
+```{r intermediaire_2}
+#| cache: true
+open_dataset(taxi_dir) |>
+  filter(year == 2016, month == 1) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  write_dataset(tempfile())
+```
+
+## Générer des fichiers intermédiaires (3)
+
+En passant par une requête SQL générée à partir de la requête `dbplyr` :
+
+```{r intermediaire_3}
+#| cache: true
+dplyr_request <- tbl(con, 
+                     glue::glue("read_parquet('{taxi_dir}/**/*.parquet')")) |>
+  filter(year == 2016, month == 1) |>
+  mutate(wday = wday(pickup_datetime))
+
+sql <- dplyr_request |> dbplyr::sql_render(con = con) |> DBI::SQL()
+
+dbExecute(con, glue::glue("COPY ({sql}) TO '{tempfile()}' (FORMAT PARQUET)"))
+```
+
+## Générer des fichiers intermédiaires (4)
+
+| méthode                                    | mémoire  | temps    |
+|--------------------------------------------|---------:|---------:|
+| `tbl() |> to_arrow() |> write_dataset()`   | 15Go     | 305s     |
+| `open_dataset() |> write_dataset()`        | 7Go      | 325s     |
+| `COPY ... TO...`                           | 2Go      | 145s     |
+
+* n'utilisez surtout pas `collect()` et/ou `arrow::write_parquet()`
+* `duckdb` génère des fichiers souvent moins compressés que `arrow` (10 à 20%)
+
+## Conversion de fichiers SAS
+
+* Plusieurs outils possibles pour les "petits" fichiers (`haven`, `parquetize`)
+* Pour les gros fichiers [readstat](https://github.com/curtisalexander/readstat-rs)
+  * `readstat` est fort en conversion mais pas en compression : repassez dessus avec `arrow`
+ ou `duckdb` (gain d'un facteur 10)
+  * attention aux `NA` spécifiques de SAS parfois convertis en `NaN`
+
+## Regardez le SQL de `duckdb`
+
+* un SQL "rajeuni"
+* des ordres et fonctions orientées statistiques
+
+Avec `duckdb`, SQL devient un langage vraiment pertinent pour vous : [un
+exemple](https://www.icem7.fr/outils/3-explorations-bluffantes-avec-duckdb-1-interroger-des-fichiers-distants/)
+
+# Conclusions
+
+## Quel format de fichier choisir
+
+* privilégiez parquet
+* N'utilisez pas le format natif de `duckdb` pour des données "pérennes".
+
+## Comment choisir votre outil
+
+1. vous n'avez pas de données massives : conservez vos outils actuels
+1. vous utilisez une seule grosse table : `arrow` et/ou `duckdb`
+1. vous devez faire des jointures entre des grosses tables : `duckdb`
+1. vous aimez SQL : `duckdb`
+
+## Vous avez converti un traitement
+
+Faites des tests :
+
+* sur quelques lignes et comparer les deux sorties.
+* sur les agrégats entre les deux méthodes
+* sur le fonctionnement de vos expressions rationnelles
+* sur la conversion des dates par `lubridate` (calcul de max sur les dates, que donne un NA...)
+* sur la présence de NaN si vos fichiers sont convertis de SAS
+* ...
+
+## Les limites des conseils
+
+Ces outils évoluent vite, certaines limites/recommandations ne seront plus
+valables dans les prochaines versions de `arrow` et `duckdb`.
+
+## FIN
+
+Merci pour les présentations INSEE sur `arrow` et `duckdb` de fin 2022
+
+## Quelques références
+
+* la [documentation de l'API R de duckdb](https://duckdb.org/docs/api/r.html)
+* la [documentation de `dbplyr`](https://dbplyr.tidyverse.org/)
+* la [documentation du SQL de duckdb](https://duckdb.org/docs/sql/introduction)
+* les pages sur [parquet](https://www.book.utilitr.org/03_fiches_thematiques/fiche_import_fichiers_parquet) et sur [l'accès aux bases de données](https://www.book.utilitr.org/03_fiches_thematiques/fiche_connexion_bdd) d'utilitR

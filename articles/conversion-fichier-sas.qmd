@@ -1,0 +1,158 @@
+---
+title: "Convertir des fichiers SAS en parquet"
+lang: fr
+execute: 
+  cache: true
+editor: 
+  markdown: 
+    wrap: 72
+format:
+  html:
+    toc: true
+---
+
+
+## Préambule
+
+Ce document décrit les différentes méthodes et problèmes rencontrés dans la
+conversion des fichiers SAS en parquet.
+
+Il sera complété au fur et à mesure.
+
+Dans la suite, nous utiliserons le fichier iris.sas7bdat du package `haven`:
+
+```{r}
+fichier_sas <- system.file('examples', 'iris.sas7bdat', package = 'haven')
+
+fichier_sas
+```
+
+## Convertir un fichier SAS
+
+Plusieurs cas sont possibles :
+
+1. votre fichier est chiffré : les outils R/python ne permettent pas de lire des
+fichiers SAS chiffrés, vous devrez donc le déchiffrer et vous retomberez dans un
+des cas suivants.
+1. votre fichier n'est "pas trop gros" : vous pourrez utiliser les outils
+classiques de R
+1. votre fichier est vraiment gros (plusieurs dizaines de Go), vous devrez
+passer par des outils spécifiques
+
+Dans tous les cas, convertir un fichier SAS est un processus lent. Comptez
+plusieurs dizaines d'heure pour un fichier de 100Go ou plus.
+
+### Votre fichier est "normal"
+
+Vous pouvez utiliser directement le package
+[`haven`](https://haven.tidyverse.org/) et plus particulièrement la fonction
+`haven::read_sas()` :
+
+```{r haven}
+haven::read_sas(fichier_sas) |>
+  arrow::write_parquet(tempfile(fileext = ".parquet"))
+```
+
+Vous pouvez bien sûr en profiter pour le partitionner si besoin :
+
+```{r haven2}
+dir <- tempfile(fileext = "_ds_parquet")
+
+haven::read_sas(fichier_sas) |>
+  arrow::write_dataset(dir, partitioning = "Species")
+
+list.files(dir)
+```
+
+Si votre fichier est plus volumineux et ne tient pas en mémoire, vous pouvez
+utiliser
+[`parquetize`](https://ddotta.github.io/parquetize/reference/table_to_parquet.html)
+(qui utilise `haven`) et utiliser l'argument `max_memory` : parquetize lira
+votre fichier SAS par morceaux et créera un dataset avec les différents morceaux
+:
+
+```{r parquetize}
+parquetize::table_to_parquet(
+  path_to_file = system.file("examples","iris.sas7bdat", package = "haven"),
+  path_to_parquet = tempfile(fileext = "ds_parquet"),
+)
+```
+
+### Votre fichier est vraiment gros
+
+Sur les fichiers vraiment gros `haven` tournera très longtemps avant de rendre
+les armes...
+
+Heureusement il existe le programme
+[readstat](https://github.com/curtisalexander/readstat-rs) qui permet de
+convertir les fichiers très volumineux en lisant par bloc de lignes (testé
+jusqu'à des fichiers de 500Go). La version 'musl' est compilé avec la librairie
+C embarquée, vous pouvez donc la copier sur un serveur linux et l'utiliser
+directement.
+
+Pour voir le contenu du fichier SAS, vous pouvez utiliser la commande `metadata`
+:
+
+```{sh}
+#| eval: false
+$ readstat metadata /nfs/rstudio-libpath/R/x86_64-pc-linux-gnu-library/4.3.1/haven/examples/iris.sas7bdat
+Metadata for the file /nfs/rstudio-libpath/R/x86_64-pc-linux-gnu-library/4.3.1/haven/examples/iris.sas7bdat
+
+Row count: 150
+Variable count: 5
+Table name: IRIS
+Table label:
+File encoding: WINDOWS-1252
+Format version: 9
+Bitness: 32-bit
+Creation time: 2016-06-08 18:38:50
+Modified time: 2016-06-08 18:38:50
+Compression: None
+Byte order: Little
+Variable names:
+0: Sepal_Length { type class: Numeric, type: Double, label: , format class: , format: BEST, arrow logical data type: Float64, arrow physical data type: Primitive(
+    Float64,
+) }
+1: Sepal_Width { type class: Numeric, type: Double, label: , format class: , format: BEST, arrow logical data type: Float64, arrow physical data type: Primitive(
+    Float64,
+) }
+2: Petal_Length { type class: Numeric, type: Double, label: , format class: , format: BEST, arrow logical data type: Float64, arrow physical data type: Primitive(
+    Float64,
+) }
+3: Petal_Width { type class: Numeric, type: Double, label: , format class: , format: BEST, arrow logical data type: Float64, arrow physical data type: Primitive(
+    Float64,
+) }
+4: Species { type class: String, type: String, label: , format class: , format: $, arrow logical data type: Utf8, arrow physical data type: Utf8 }
+```
+
+Et pour le convertir, la commande `data` :
+
+```{sh}
+#| eval: false
+$ readstat data fichier.sas7bdat --output fichier.sas7bdat --format parquet
+Writing parsed data to file /home/n.chuche/fichier.parquet
+Wrote 150 rows from file iris.sas7bdat into fichier.parquet
+In total, wrote 150 rows from file iris.sas7bdat into fichier.parquet
+```
+
+Comme indiqué au début de ce document, la conversion d'un fichier volumineux
+prend du temps, beaucoup de temps, comptez plusieurs jours pour des fichiers
+vraiment de plusieurs centaines de Go.
+
+## Les problèmes rencontrés à la conversion
+
+SAS a plusieurs valeurs `NA`, certaines sont traduites en NaN dans parquet.
+Votre fichier contiendra donc plein de NaN qui poseront des problèmes dans vos
+calculs R (`NaN` étant considéré comme `Inf`, il n'est pas du tout géré comme NA
+dans les fonctions mathématique, il est considéré comme Inf...)
+
+Sauf à vouloir, à chacun de vos calculs, remplacer les `NaN` par des `NA`, vous
+devrez réaliser une conversion supplémentaire.
+
+## Recetter la conversion
+
+* faites des agrégats
+* comparer quelques lignes
+
+Vérifiez bien vos dates.
+

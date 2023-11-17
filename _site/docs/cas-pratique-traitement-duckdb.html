@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.335">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>big data &amp; R - Cas pratique d’une migration d’un traitement vers duckdb</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "Pas de résultats",
+    "search-matching-documents-text": "documents trouvés",
+    "search-copy-link-title": "Copier le lien vers la recherche",
+    "search-hide-matches-text": "Cacher les correspondances additionnelles",
+    "search-more-match-text": "correspondance de plus dans ce document",
+    "search-more-matches-text": "correspondances de plus dans ce document",
+    "search-clear-button-title": "Effacer",
+    "search-detached-cancel-button-title": "Annuler",
+    "search-submit-button-title": "Envoyer"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar docked">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+    <div class="container-fluid d-flex justify-content-between">
+      <h1 class="quarto-secondary-nav-title">Cas pratique d’une migration d’un traitement vers duckdb</h1>
+      <button type="button" class="quarto-btn-toggle btn" aria-label="Show secondary navigation">
+        <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">big data &amp; R</a> 
+    </div>
+      </div>
+      <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+      </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">Les outils big data de R</a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="true">Quelques documents en vracs</a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="true">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/introduction-donnees-massives-arrow.html" class="sidebar-item-text sidebar-link">Introduction à arrow</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/introduction-duckdb.html" class="sidebar-item-text sidebar-link">Introduction à duckdb</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/cas-pratique-traitement-duckdb.html" class="sidebar-item-text sidebar-link active">Un exemple de conversion a duckdb</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/conversion-fichier-sas.html" class="sidebar-item-text sidebar-link">Notes sur la conversion de fichiers SAS</a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true">Présentations</a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../docs/presentation_insee.html" class="sidebar-item-text sidebar-link">REX SDES - Présentation INSEE</a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Sur cette page</h2>
+   
+  <ul>
+  <li><a href="#présentation-du-cas" id="toc-présentation-du-cas" class="nav-link active" data-scroll-target="#présentation-du-cas">Présentation du cas</a></li>
+  <li><a href="#le-code-dorigine" id="toc-le-code-dorigine" class="nav-link" data-scroll-target="#le-code-dorigine">Le code d’origine</a></li>
+  <li><a href="#première-étape-utilisation-de-duckdb-et-dplyr" id="toc-première-étape-utilisation-de-duckdb-et-dplyr" class="nav-link" data-scroll-target="#première-étape-utilisation-de-duckdb-et-dplyr">Première étape : utilisation de <code>duckdb</code> et <code>dplyr</code></a>
+  <ul class="collapse">
+  <li><a href="#linitialisation" id="toc-linitialisation" class="nav-link" data-scroll-target="#linitialisation">L’initialisation</a></li>
+  <li><a href="#création-des-tables-de-base-de-données-à-utiliser" id="toc-création-des-tables-de-base-de-données-à-utiliser" class="nav-link" data-scroll-target="#création-des-tables-de-base-de-données-à-utiliser">Création des tables de base de données à utiliser</a></li>
+  <li><a href="#création-de-la-requête-dbplyr" id="toc-création-de-la-requête-dbplyr" class="nav-link" data-scroll-target="#création-de-la-requête-dbplyr">Création de la requête <code>dbplyr</code></a></li>
+  <li><a href="#on-exécute-la-requête" id="toc-on-exécute-la-requête" class="nav-link" data-scroll-target="#on-exécute-la-requête">on exécute la requête</a></li>
+  </ul></li>
+  <li><a href="#dernière-étape-doptimisation" id="toc-dernière-étape-doptimisation" class="nav-link" data-scroll-target="#dernière-étape-doptimisation">Dernière étape d’optimisation</a>
+  <ul class="collapse">
+  <li><a href="#la-solution-arrowwrite_dataset" id="toc-la-solution-arrowwrite_dataset" class="nav-link" data-scroll-target="#la-solution-arrowwrite_dataset">La solution <code>arrow::write_dataset()</code></a></li>
+  <li><a href="#la-solution-full-duckdb" id="toc-la-solution-full-duckdb" class="nav-link" data-scroll-target="#la-solution-full-duckdb">La solution “full” <code>duckdb</code></a></li>
+  </ul></li>
+  <li><a href="#discussion-sur-la-conversion-de-dplyr-à-dbplyr" id="toc-discussion-sur-la-conversion-de-dplyr-à-dbplyr" class="nav-link" data-scroll-target="#discussion-sur-la-conversion-de-dplyr-à-dbplyr">Discussion sur la conversion de <code>dplyr</code> à <code>dbplyr</code></a></li>
+  <li><a href="#peut-on-utiliser-uniquement-arrow-sur-ce-traitement" id="toc-peut-on-utiliser-uniquement-arrow-sur-ce-traitement" class="nav-link" data-scroll-target="#peut-on-utiliser-uniquement-arrow-sur-ce-traitement">Peut-on utiliser uniquement <code>arrow</code> sur ce traitement ?</a></li>
+  <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions">Conclusions</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title d-none d-lg-block">Cas pratique d’une migration d’un traitement vers duckdb</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="présentation-du-cas" class="level2">
+<h2 class="anchored" data-anchor-id="présentation-du-cas">Présentation du cas</h2>
+<p>Ce cas pratique vient du transport. Il sert à préparer des fichiers d’étude à partir de deux jeux de données :</p>
+<ul>
+<li>vehicule : les propriétés d’un véhicule (immat, cylindrée, énergie, date de mise en circulation…) fait 70 millions de lignes</li>
+<li>annee : les évènements liés à un véhicule par année (km parcouru, présence dans le parc… ) fait 490 millions de lignes</li>
+</ul>
+<p>Et d’une troisième table de 50 lignes avec la nomenclature des carburants.</p>
+<p>Dans le code d’origine, afin de tenir sur le serveur, les données vehicule et annee d’origine sont partitionnées à la main en 10 fichiers véhicules et 10 fichiers années correspondants pour générer 10 fichiers d’étude.</p>
+<p>Le traitement actuel est le suivant :</p>
+<ol type="1">
+<li>charge deux fichiers de données parquet en mémoire avec `arrow::read_parquet()</li>
+<li>fait une jointure entre les deux fichiers de données avec <code>dplyr</code></li>
+<li>ajoute des colonnes calculées toujours avec <code>dplyr</code> (année de mise en circulation à partir de la date, la quantité de CO2 émise par tranche…)</li>
+<li>écrit le fichier résultat</li>
+</ol>
+<p>Notre cas pratique reprend uniquement la génération d’un fichier d’étude sur les 10.</p>
+<p>Dans le suite, nous allons rapidement présenter le code d’origine et voir les différentes évolutions possibles.</p>
+</section>
+<section id="le-code-dorigine" class="level2">
+<h2 class="anchored" data-anchor-id="le-code-dorigine">Le code d’origine</h2>
+<p>Le programme d’origine utilise <code>arrow</code> uniquement pour la lecture des données au format parquet. Les calculs sont réalisés avec <code>dplyr</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">"arrow"</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">"dplyr"</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">"readxl"</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">"writexl"</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tictoc)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">"data.table"</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>chemin_donnees_sources <span class="ot">&lt;-</span> <span class="st">"/home/nc/projet/Parc/"</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>grille_carbu <span class="ot">&lt;-</span> <span class="fu">subset</span>(</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">read_xlsx</span>(<span class="st">"/home/nc/projet/Nomenclature/Vehicule/nomenclature_carburant_mai_2022.xlsx"</span>),</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">select=</span><span class="fu">c</span>(carbu_simpl,carbu_det,energ))</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="do">### Boucle pour préparer et exporter toutes les tables data_etude_0 à data_etude_9. </span><span class="al">###</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>data <span class="ot">&lt;-</span> <span class="fu">left_join</span>(<span class="fu">read_parquet</span>(<span class="fu">paste0</span>(chemin_donnees_sources,<span class="st">"data_annee_VP_0.parquet"</span>),</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>                               <span class="at">col_select =</span> <span class="fu">c</span>(<span class="st">"id"</span>,<span class="st">"year"</span>,<span class="st">"parc_01_01"</span>,<span class="st">"parcm"</span>,<span class="st">"km"</span>)),</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">read_parquet</span>(<span class="fu">paste0</span>(chemin_donnees_sources,<span class="st">"data_vehicule_VP_0.parquet"</span>),</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>                               <span class="at">col_select =</span> <span class="fu">c</span>(<span class="st">"id"</span>,<span class="st">"date_mise_en_cir"</span>,<span class="st">"energ"</span>,<span class="st">"co2_theorique"</span>,</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>                                              <span class="st">"puis_kw"</span>,<span class="st">"poids_vide"</span>,<span class="st">"crit_air"</span>,<span class="st">"conso_reelle"</span>,</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>                                              <span class="st">"co2_reel"</span>))</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>                  ,<span class="at">by=</span><span class="st">"id"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year<span class="sc">&gt;=</span><span class="dv">2012</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">poids_vide_tr =</span> <span class="fu">cut</span>(poids_vide,</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>                        <span class="at">breaks=</span><span class="fu">c</span>(<span class="fu">min</span>(poids_vide,<span class="at">na.rm=</span><span class="cn">TRUE</span>),<span class="dv">1000</span>,<span class="dv">1200</span>,<span class="dv">1500</span>,<span class="dv">1800</span>,<span class="dv">2000</span>,</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>                                 <span class="fu">max</span>(poids_vide,<span class="at">na.rm=</span><span class="cn">TRUE</span>)),</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>                        <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>                        <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 1000 kg"</span>,</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>                                 <span class="st">"2 - plus de 1 à 1,2 t"</span>,</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>                                 <span class="st">"3 - plus de 1,2 à 1,5 t"</span>,</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>                                 <span class="st">"4 - plus de 1,5 à 1,8 t"</span>,</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>                                 <span class="st">"5 - plus de 1,8 à 2 t"</span>,</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>                                 <span class="st">"6 - plus de 2 t"</span>)),</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">annee_mise_en_cir =</span> <span class="fu">as.numeric</span>(<span class="fu">substr</span>(date_mise_en_cir,<span class="dv">1</span>,<span class="dv">4</span>)),</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>    <span class="at">age =</span> <span class="fu">as.numeric</span>(<span class="fu">difftime</span>(<span class="fu">as.IDate</span>(<span class="fu">paste0</span>(year,<span class="st">"-01-01"</span>)),date_mise_en_cir,<span class="at">units=</span><span class="st">"days"</span>)<span class="sc">/</span><span class="fl">365.25</span>),</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>    <span class="at">age_tr =</span> <span class="fu">cut</span>(age,</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>                 <span class="at">breaks=</span><span class="fu">c</span>(<span class="fu">min</span>(age,<span class="at">na.rm=</span><span class="cn">TRUE</span>),<span class="dv">2</span>,<span class="dv">5</span>,<span class="dv">10</span>,<span class="dv">15</span>,<span class="dv">20</span>,<span class="dv">25</span>,<span class="fu">max</span>(age,<span class="at">na.rm=</span><span class="cn">TRUE</span>)),</span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>                 <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>                 <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 2 ans"</span>,</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"2 - plus de 2 à 5 ans"</span>,</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"3 - plus de 5 à 10 ans"</span>,</span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"4 - plus de 10 à 15 ans"</span>,</span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"5 - plus de 15 à 20 ans"</span>,</span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"6 - plus de 20 à 25 ans"</span>,</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"7 - plus de 25 ans"</span>)),</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>    <span class="at">co2_reel =</span> <span class="fu">as.numeric</span>(co2_reel),</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>    <span class="at">co2_reel_tr =</span> <span class="fu">cut</span>(co2_reel,</span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>                      <span class="at">breaks=</span><span class="fu">c</span>(<span class="fu">min</span>(co2_reel,<span class="at">na.rm=</span><span class="cn">TRUE</span>),<span class="dv">125</span>,<span class="dv">150</span>,<span class="dv">175</span>,<span class="dv">200</span>,<span class="fu">max</span>(co2_reel,<span class="at">na.rm=</span><span class="cn">TRUE</span>)),</span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>                      <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>                      <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 125 g/km"</span>,</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"2 - plus de 125 à 150 g/km"</span>,</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"3 - plus de 150 à 175 g/km"</span>,</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"4 - plus de 175 à 200 g/km"</span>,</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"5 - plus de 200 g/km"</span>)),</span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>    <span class="at">co2_reel_tr =</span> <span class="fu">ifelse</span>(crit_air<span class="sc">==</span><span class="st">"E"</span>,<span class="st">"0 - véhicule électrique"</span>,co2_reel_tr),</span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>    <span class="at">co2_reel_tr =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(co2_reel_tr),<span class="st">"NA - inconnu"</span>,co2_reel_tr),</span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>    <span class="at">co2_theorique =</span> <span class="fu">as.numeric</span>(co2_theorique),</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>    <span class="at">co2_theorique_tr =</span> <span class="fu">cut</span>(co2_theorique,</span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a>                           <span class="at">breaks=</span><span class="fu">c</span>(<span class="fu">min</span>(co2_theorique,<span class="at">na.rm=</span><span class="cn">TRUE</span>),<span class="dv">125</span>,<span class="dv">150</span>,<span class="dv">175</span>,<span class="dv">200</span>,</span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>                                    <span class="fu">max</span>(co2_theorique,<span class="at">na.rm=</span><span class="cn">TRUE</span>)),</span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>                           <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a>                           <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 125 g/km"</span>,</span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"2 - plus de 125 à 150 g/km"</span>,</span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"3 - plus de 150 à 175 g/km"</span>,</span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"4 - plus de 175 à 200 g/km"</span>,</span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">"5 - plus de 200 g/km"</span>)),</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a>    <span class="at">co2_theorique_tr =</span> <span class="fu">ifelse</span>(crit_air<span class="sc">==</span><span class="st">"E"</span>,<span class="st">"0 - véhicule électrique"</span>,co2_theorique_tr),</span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a>    <span class="at">co2_theorique_tr =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(co2_theorique_tr),<span class="st">"NA - inconnu"</span>,co2_theorique_tr),</span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a>    <span class="at">puis_kw_tr =</span> <span class="fu">cut</span>(puis_kw,</span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a>                     <span class="at">breaks=</span><span class="fu">c</span>(<span class="fu">min</span>(puis_kw,<span class="at">na.rm=</span><span class="cn">TRUE</span>),<span class="dv">55</span>,<span class="dv">70</span>,<span class="dv">85</span>,<span class="dv">100</span>,<span class="fu">max</span>(puis_kw,<span class="at">na.rm=</span><span class="cn">TRUE</span>)),</span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a>                     <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a>                     <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 55 kw"</span>,</span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a>                              <span class="st">"2 - plus de 55 à 70 kw"</span>,</span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a>                              <span class="st">"3 - plus de 70 à 85 kw"</span>,</span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a>                              <span class="st">"4 - plus de 85 à 100 kw"</span>,</span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a>                              <span class="st">"5 - plus de 100 kw"</span>)),</span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a>    <span class="at">puis_kw_tr =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(puis_kw_tr),<span class="st">"NA - inconnu"</span>,puis_kw_tr)</span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(grille_carbu,<span class="at">by=</span><span class="st">"energ"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a>    <span class="at">carbu_agreg =</span> <span class="fu">ifelse</span>(carbu_det <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Diesel"</span>,<span class="st">"Biodiesel"</span>,<span class="st">"Diesel HNR"</span>,<span class="st">"Diesel HR"</span>),</span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a>                         <span class="st">"Diesel (y compris hybrides)"</span>,</span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a>                         <span class="st">"Essence et autres énergies"</span>),</span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a>    <span class="at">carbu_agreg2 =</span> <span class="fu">ifelse</span>(carbu_simpl <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Diesel"</span>,<span class="st">"Essence"</span>),</span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"Diesel et Essence thermiques"</span>,</span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"Autres énergies"</span>)</span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a><span class="fu">write_parquet</span>(data, <span class="st">"origine.parquet"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Le code fonctionne parfaitement et le temps de traitement est de l’ordre de 15min pour une consommation en pic 25Go de mémoire.</p>
+</div>
+</div>
+<p>Il pourrait certainement être optimisé, le <code>mutate</code> réalisé à la fin pourrait l’être directement sur la table grille_carbu au début pour éviter de devoir modifier les millions de lignes mais ça restera de l’optimisation à la marge (test fait, le traitement passe à 12min).</p>
+<p>Les principaux problèmes de ce code, (écrit à une époque ou <code>arrow</code> n’était pas encore vraiment utilisable sur nos serveurs) sont que :</p>
+<ul>
+<li>les données sont entièrement chargées en mémoire par <code>arrow::read_parquet()</code></li>
+<li>les calculs sont réalisés par <code>dplyr</code> qui n’est pas connu pour être rapide</li>
+</ul>
+<p>Si ça ne pose pas de problème sur quelques milliers voire centaines de milliers de lignes, ça devient rédhibitoire quand on croise des dizaines de millions de lignes.</p>
+</section>
+<section id="première-étape-utilisation-de-duckdb-et-dplyr" class="level2">
+<h2 class="anchored" data-anchor-id="première-étape-utilisation-de-duckdb-et-dplyr">Première étape : utilisation de <code>duckdb</code> et <code>dplyr</code></h2>
+<p>Dans cette première étape, nous allons essayer d’éviter de charger les données dans R et, surtout, de faire la jointure en mémoire. Pour cela nous allons lire les données avec <code>duckdb</code> et les traiter avec <code>dplyr</code> qui, en sous-main, va utiliser <code>dbplyr</code> (la version de <code>dplyr</code> pour les bases de données).</p>
+<section id="linitialisation" class="level3">
+<h3 class="anchored" data-anchor-id="linitialisation">L’initialisation</h3>
+<p>Nous allons commencer par charger les packages nécessaires et on créé une variable avec les chemins :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(arrow)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readxl)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(duckdb)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lubridate)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tictoc)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>chemin_donnees_sources <span class="ot">&lt;-</span> <span class="st">"/home/nc/projet/Parc/Parc_2022/Donnees_individuelles/"</span></span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Puis nous créons une base de données dans le fichier <code>test.duckdb</code>, on limite la mémoire à 10Go et le nombre de CPU utilisé à 4 pour ne pas écrouler le serveur.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>con <span class="ot">&lt;-</span> DBI<span class="sc">::</span><span class="fu">dbConnect</span>(<span class="fu">duckdb</span>(), <span class="at">dbdir =</span> <span class="st">"test.duckdb"</span>,            </span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>                      <span class="at">config=</span><span class="fu">list</span>(<span class="st">"memory_limit"</span><span class="ot">=</span><span class="st">"10GB"</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>                                  <span class="st">"threads=4"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="création-des-tables-de-base-de-données-à-utiliser" class="level3">
+<h3 class="anchored" data-anchor-id="création-des-tables-de-base-de-données-à-utiliser">Création des tables de base de données à utiliser</h3>
+<p>Le référentiel des carburants n’étant pas un fichier parquet, on écrit les données dans la base avec la commande <code>DBI::dbWriteTable()</code></p>
+<p>On créé les objets <code>vehicule</code>, <code>annee</code> et <code>grille_carbu</code> avec <code>dplyr::tbl()</code>, cette fonction transforme une table de base de données ou un fichier parquet en objet utilisable par <code>dplyr</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">read_xlsx</span>(<span class="st">"/home/nc/projet/Nomenclature/Vehicule/nomenclature_carburant_mai_2022.xlsx"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(carbu_simpl,carbu_det,energ) <span class="sc">|&gt;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">dbWriteTable</span>(con, <span class="st">"grille_carbu"</span>, <span class="at">value =</span> _, <span class="at">overwrite =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>grille_carbu <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="st">"grille_carbu"</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>vehicule <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="fu">file.path</span>(chemin_donnees_sources, <span class="st">"data_vehicule_VP_0.parquet"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(id, date_mise_en_cir,energ, co2_theorique,puis_kw,poids_vide,crit_air,conso_reelle,co2_reel)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>annee <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="fu">file.path</span>(chemin_donnees_sources, <span class="st">"data_annee_VP_0.parquet"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(id, year, parc_01_01, parcm, km)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="création-de-la-requête-dbplyr" class="level3">
+<h3 class="anchored" data-anchor-id="création-de-la-requête-dbplyr">Création de la requête <code>dbplyr</code></h3>
+<p>J’ai pris le parti de modifier le code d’origine à minima pour qu’il fonctionne avec <code>dbplyr</code>, les modifications sont à trois niveaux :</p>
+<ul>
+<li>changer les bornes des <code>cut</code> pour les passer à <code>0</code> et <code>Inf</code> plutôt que de calculer les min et max</li>
+<li>utiliser <code>lubridate::year()</code> plutôt que <code>as.numeric(substr(date_mise_en_cir,1,4))</code> (ligne 5)</li>
+<li>utiliser <code>lubridate::as_date()</code> pour calculer l’age du véhicule (ligne 6)</li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1"></a>request <span class="ot">&lt;-</span> vehicule <span class="sc">%&gt;%</span></span>
+<span id="cb5-2"><a href="#cb5-2"></a>  <span class="fu">right_join</span>(annee, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"id"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb5-3"><a href="#cb5-3"></a>  <span class="fu">filter</span>(year <span class="sc">&gt;=</span> <span class="dv">2012</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb5-4"><a href="#cb5-4"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb5-5"><a href="#cb5-5"></a>    <span class="at">annee_mise_en_cir =</span> <span class="fu">year</span>(date_mise_en_cir),</span>
+<span id="cb5-6"><a href="#cb5-6"></a>    <span class="at">age =</span> (<span class="fu">as_date</span>(<span class="fu">paste0</span>(year, <span class="st">"-01-01"</span>)) <span class="sc">-</span> date_mise_en_cir ) <span class="sc">/</span> <span class="fl">365.25</span>,</span>
+<span id="cb5-7"><a href="#cb5-7"></a>    <span class="at">poids_vide_tr =</span> <span class="fu">cut</span>(poids_vide,</span>
+<span id="cb5-8"><a href="#cb5-8"></a>                      <span class="at">breaks=</span><span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">1000</span>,<span class="dv">1200</span>,<span class="dv">1500</span>,<span class="dv">1800</span>,<span class="dv">2000</span>,<span class="cn">Inf</span>),</span>
+<span id="cb5-9"><a href="#cb5-9"></a>                      <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb5-10"><a href="#cb5-10"></a>                      <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 1000 kg"</span>,</span>
+<span id="cb5-11"><a href="#cb5-11"></a>                               <span class="st">"2 - plus de 1 à 1,2 t"</span>,</span>
+<span id="cb5-12"><a href="#cb5-12"></a>                               <span class="st">"3 - plus de 1,2 à 1,5 t"</span>,</span>
+<span id="cb5-13"><a href="#cb5-13"></a>                               <span class="st">"4 - plus de 1,5 à 1,8 t"</span>,</span>
+<span id="cb5-14"><a href="#cb5-14"></a>                               <span class="st">"5 - plus de 1,8 à 2 t"</span>,</span>
+<span id="cb5-15"><a href="#cb5-15"></a>                               <span class="st">"6 - plus de 2 t"</span>)),</span>
+<span id="cb5-16"><a href="#cb5-16"></a>    <span class="at">age_tr =</span> <span class="fu">cut</span>(age,</span>
+<span id="cb5-17"><a href="#cb5-17"></a>                 <span class="at">breaks=</span><span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">2</span>,<span class="dv">5</span>,<span class="dv">10</span>,<span class="dv">15</span>,<span class="dv">20</span>,<span class="dv">25</span>,<span class="cn">Inf</span>),</span>
+<span id="cb5-18"><a href="#cb5-18"></a>                 <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb5-19"><a href="#cb5-19"></a>                 <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 2 ans"</span>,</span>
+<span id="cb5-20"><a href="#cb5-20"></a>                          <span class="st">"2 - plus de 2 à 5 ans"</span>,</span>
+<span id="cb5-21"><a href="#cb5-21"></a>                          <span class="st">"3 - plus de 5 à 10 ans"</span>,</span>
+<span id="cb5-22"><a href="#cb5-22"></a>                          <span class="st">"4 - plus de 10 à 15 ans"</span>,</span>
+<span id="cb5-23"><a href="#cb5-23"></a>                          <span class="st">"5 - plus de 15 à 20 ans"</span>,</span>
+<span id="cb5-24"><a href="#cb5-24"></a>                          <span class="st">"6 - plus de 20 à 25 ans"</span>,</span>
+<span id="cb5-25"><a href="#cb5-25"></a>                          <span class="st">"7 - plus de 25 ans"</span>)),</span>
+<span id="cb5-26"><a href="#cb5-26"></a>    <span class="at">co2_reel_tr =</span> <span class="fu">cut</span>(co2_reel,</span>
+<span id="cb5-27"><a href="#cb5-27"></a>                      <span class="at">breaks=</span><span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">100</span>,<span class="dv">130</span>,<span class="dv">140</span>,<span class="dv">155</span>,<span class="dv">175</span>,<span class="dv">200</span>,<span class="cn">Inf</span>),</span>
+<span id="cb5-28"><a href="#cb5-28"></a>                      <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb5-29"><a href="#cb5-29"></a>                      <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 123 g/km"</span>,</span>
+<span id="cb5-30"><a href="#cb5-30"></a>                               <span class="st">"2 - plus de 123 à 138 g/km"</span>,</span>
+<span id="cb5-31"><a href="#cb5-31"></a>                               <span class="st">"3 - plus de 138 à 165 g/km"</span>,</span>
+<span id="cb5-32"><a href="#cb5-32"></a>                               <span class="st">"4 - plus de 165 à 190 g/km"</span>,</span>
+<span id="cb5-33"><a href="#cb5-33"></a>                               <span class="st">"5 - plus de 190 à 213 g/km"</span>,</span>
+<span id="cb5-34"><a href="#cb5-34"></a>                               <span class="st">"6 - plus de 213 à 226 g/km"</span>,</span>
+<span id="cb5-35"><a href="#cb5-35"></a>                               <span class="st">"7 - plus de 226 g/km"</span>)),</span>
+<span id="cb5-36"><a href="#cb5-36"></a>    <span class="at">co2_reel_tr =</span> <span class="fu">ifelse</span>(crit_air<span class="sc">==</span><span class="st">"E"</span>,<span class="st">"0 - véhicule électrique"</span>,co2_reel_tr),</span>
+<span id="cb5-37"><a href="#cb5-37"></a>    <span class="at">co2_reel_tr =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(co2_reel_tr),<span class="st">"NA - inconnu"</span>,co2_reel_tr),</span>
+<span id="cb5-38"><a href="#cb5-38"></a>    <span class="at">co2_theorique_tr =</span> <span class="fu">cut</span>(co2_theorique,</span>
+<span id="cb5-39"><a href="#cb5-39"></a>                           <span class="at">breaks=</span><span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">123</span>,<span class="dv">138</span>,<span class="dv">165</span>,<span class="dv">190</span>,<span class="dv">213</span>,<span class="dv">226</span>,<span class="cn">Inf</span>),</span>
+<span id="cb5-40"><a href="#cb5-40"></a>                           <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb5-41"><a href="#cb5-41"></a>                           <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 123 g/km"</span>,</span>
+<span id="cb5-42"><a href="#cb5-42"></a>                                    <span class="st">"2 - plus de 123 à 138 g/km"</span>,</span>
+<span id="cb5-43"><a href="#cb5-43"></a>                                    <span class="st">"3 - plus de 138 à 165 g/km"</span>,</span>
+<span id="cb5-44"><a href="#cb5-44"></a>                                    <span class="st">"4 - plus de 165 à 190 g/km"</span>,</span>
+<span id="cb5-45"><a href="#cb5-45"></a>                                    <span class="st">"5 - plus de 190 à 213 g/km"</span>,</span>
+<span id="cb5-46"><a href="#cb5-46"></a>                                    <span class="st">"6 - plus de 213 à 226 g/km"</span>,</span>
+<span id="cb5-47"><a href="#cb5-47"></a>                                    <span class="st">"7 - plus de 226 g/km"</span>)),</span>
+<span id="cb5-48"><a href="#cb5-48"></a>    <span class="at">co2_theorique_tr =</span> <span class="fu">ifelse</span>(crit_air<span class="sc">==</span><span class="st">"E"</span>,<span class="st">"0 - véhicule électrique"</span>,co2_theorique_tr),</span>
+<span id="cb5-49"><a href="#cb5-49"></a>    <span class="at">co2_theorique_tr =</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(co2_theorique_tr),<span class="st">"NA - inconnu"</span>,co2_theorique_tr),</span>
+<span id="cb5-50"><a href="#cb5-50"></a>    <span class="at">puis_kw_tr =</span> <span class="fu">cut</span>(puis_kw,</span>
+<span id="cb5-51"><a href="#cb5-51"></a>                     <span class="at">breaks=</span><span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">55</span>,<span class="dv">70</span>,<span class="dv">85</span>,<span class="dv">100</span>,<span class="cn">Inf</span>),</span>
+<span id="cb5-52"><a href="#cb5-52"></a>                     <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb5-53"><a href="#cb5-53"></a>                     <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 55 kw"</span>,</span>
+<span id="cb5-54"><a href="#cb5-54"></a>                              <span class="st">"2 - plus de 55 à 70 kw"</span>,</span>
+<span id="cb5-55"><a href="#cb5-55"></a>                              <span class="st">"3 - plus de 70 à 85 kw"</span>,</span>
+<span id="cb5-56"><a href="#cb5-56"></a>                              <span class="st">"4 - plus de 85 à 100 kw"</span>,</span>
+<span id="cb5-57"><a href="#cb5-57"></a>                              <span class="st">"5 - plus de 100 kw"</span>))</span>
+<span id="cb5-58"><a href="#cb5-58"></a>    ) <span class="sc">%&gt;%</span></span>
+<span id="cb5-59"><a href="#cb5-59"></a>  <span class="fu">left_join</span>(grille_carbu, <span class="at">by =</span> <span class="st">"energ"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb5-60"><a href="#cb5-60"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb5-61"><a href="#cb5-61"></a>    <span class="at">carbu_agreg =</span> <span class="fu">ifelse</span>(carbu_det <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Diesel"</span>,<span class="st">"Biodiesel"</span>,<span class="st">"Diesel HNR"</span>,<span class="st">"Diesel HR"</span>),</span>
+<span id="cb5-62"><a href="#cb5-62"></a>                         <span class="st">"Diesel (y compris hybrides)"</span>,</span>
+<span id="cb5-63"><a href="#cb5-63"></a>                         <span class="st">"Essence et autres énergies"</span>),</span>
+<span id="cb5-64"><a href="#cb5-64"></a>    <span class="at">carbu_agreg2 =</span> <span class="fu">ifelse</span>(carbu_simpl <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Diesel"</span>,<span class="st">"Essence"</span>),</span>
+<span id="cb5-65"><a href="#cb5-65"></a>                          <span class="st">"Diesel et Essence thermiques"</span>,</span>
+<span id="cb5-66"><a href="#cb5-66"></a>                          <span class="st">"Autres énergies"</span>)</span>
+<span id="cb5-67"><a href="#cb5-67"></a>  )</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Cette commande retourne (quasiment) immédiatement car à ce stade, l’objet request n’est pas encore évalué, on parle de “lazy evaluation”, il contient juste les ordres à passer.</p>
+</section>
+<section id="on-exécute-la-requête" class="level3">
+<h3 class="anchored" data-anchor-id="on-exécute-la-requête">on exécute la requête</h3>
+<p>La requête est effectivement exécuté au moment de la commande <code>write_parquet()</code>, <code>dbplyr</code> va alors transformer tous les ordres en SQL et les envoyer à la base de données.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>request <span class="sc">%&gt;%</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">to_arrow</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_parquet</span>(<span class="st">"dbplyr.parquet"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Ce code prend autour de 150 secondes et consomme au pic 15/16Go de mémoire.</p>
+</div>
+</div>
+<div class="callout-tip callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Astuce
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>La limite à 10Go de <code>duckdb</code> ne fonctionne visiblement pas, pourquoi ?</p>
+<p>Une partie de la mémoire est utilisée par <code>arrow</code> au moment de la matérialisation et, évidemment, les limites fixées à <code>duckdb</code> ne peuvent pas s’appliquer sur <code>arrow</code>.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="dernière-étape-doptimisation" class="level2">
+<h2 class="anchored" data-anchor-id="dernière-étape-doptimisation">Dernière étape d’optimisation</h2>
+<p>Peut-on aller plus loin ? Oui mais pour ça il faut éviter de matérialiser les données.</p>
+<p>Il y a deux solutions :</p>
+<section id="la-solution-arrowwrite_dataset" class="level3">
+<h3 class="anchored" data-anchor-id="la-solution-arrowwrite_dataset">La solution <code>arrow::write_dataset()</code></h3>
+<p>La première solution est d’utiliser <code>arrow::write_dataset()</code> à la place de <code>arrow::write_parquet()</code>.</p>
+<p>En effet, contrairement à <code>write_parquet()</code>, <code>write_dataset()</code> sait lire les données envoyées par la requête <code>dbplyr</code> au fur et à mesure tandis que <code>write_parquet</code> a besoin de la totalité des données pour les écrire.</p>
+<p>Changer les dernières lignes <code>write_dataset()</code> a un impact majeur :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>request <span class="sc">%&gt;%</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">to_arrow</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_dataset</span>(<span class="st">"dbplyr_parquet"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Ce code prend autour de 100 secondes et consomme au pic 2Go de mémoire.</p>
+</div>
+</div>
+</section>
+<section id="la-solution-full-duckdb" class="level3">
+<h3 class="anchored" data-anchor-id="la-solution-full-duckdb">La solution “full” <code>duckdb</code></h3>
+<p>La seconde solution est d’utiliser la commande native de <code>duckdb</code> pour générer les fichiers parquet : <a href="https://duckdb.org/docs/sql/statements/copy.html"><code>COPY ... TO ...</code></a></p>
+<p>Si vous êtes expert en SQL vous pouvez convertir mais ça n’est pas mon cas alors nous allons utiliser la fonction <code>dbplyr::sql_render()</code> et utiliser directement le SQL généré par <code>dbplyr</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>sql <span class="ot">&lt;-</span> request <span class="sc">%&gt;%</span> </span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  dbplyr<span class="sc">::</span><span class="fu">sql_render</span>(<span class="at">con =</span> con)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>La variable <code>sql</code> contient une requête :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="op">&lt;</span>SQL<span class="op">&gt;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="op">*</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> (carbu_det <span class="kw">IN</span> (<span class="st">'Diesel'</span>, <span class="st">'Biodiesel'</span>, <span class="st">'Diesel HNR'</span>, <span class="st">'Diesel HR'</span>)) <span class="cf">THEN</span> <span class="st">'Diesel (y compris hybrides)'</span> <span class="cf">WHEN</span> <span class="kw">NOT</span> (carbu_det <span class="kw">IN</span> (<span class="st">'Diesel'</span>, <span class="st">'Biodiesel'</span>, <span class="st">'Diesel HNR'</span>, <span class="st">'Diesel HR'</span>)) <span class="cf">THEN</span> <span class="st">'Essence et autres énergies'</span> <span class="cf">END</span> <span class="kw">AS</span> carbu_agreg,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> (carbu_simpl <span class="kw">IN</span> (<span class="st">'Diesel'</span>, <span class="st">'Essence'</span>)) <span class="cf">THEN</span> <span class="st">'Diesel et Essence thermiques'</span> <span class="cf">WHEN</span> <span class="kw">NOT</span> (carbu_simpl <span class="kw">IN</span> (<span class="st">'Diesel'</span>, <span class="st">'Essence'</span>)) <span class="cf">THEN</span> <span class="st">'Autres énergies'</span> <span class="cf">END</span> <span class="kw">AS</span> carbu_agreg2</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> (</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">SELECT</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">CASE</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="cf">WHEN</span> (puis_kw <span class="op">&lt;=</span> <span class="fl">55.0</span>) <span class="cf">THEN</span> <span class="st">'1 - moins de 55 kw'</span>[<span class="op">..</span>.]</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>[<span class="op">..</span>.]</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Le SQL est “brutal” mais :</p>
+<ul>
+<li>nous ne sommes pas à un concours de beau code</li>
+<li>l’optimisation c’est le boulot de <code>duckdb</code></li>
+</ul>
+<p>Nous allons enfin utiliser le SQL généré pour écrire le fichier :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(con, glue<span class="sc">::</span><span class="fu">glue</span>(<span class="st">"COPY ({DBI::SQL(request)}) TO 'test2.parquet'"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Et alors ?</p>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Ce code prend également autour de 100 secondes et consomme 1,7Go de mémoire en pic.</p>
+</div>
+</div>
+<p>On aurait aussi pu partitionner par exemple sur <code>year</code> si cette variable était beaucoup utilisée pour des <code>filter</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(con, glue<span class="sc">::</span><span class="fu">glue</span>(<span class="st">"COPY ({DBI::SQL(request)}) </span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="st">                          TO 'dataset_par_annee' (FORMAT PARQUET, PARTITION_BY (year))"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>On peut noter également que le fichier parquet généré par <code>duckdb</code> est 20% plus gros que celui de <code>arrow</code> (730Go contre 600).</p>
+<p>Nous venons de passer le traitement de 15min et plus de 25Go à 100s et 1,7 ou 2Go. On peut s’arrêter là pour aujourd’hui non ?</p>
+</section>
+</section>
+<section id="discussion-sur-la-conversion-de-dplyr-à-dbplyr" class="level2">
+<h2 class="anchored" data-anchor-id="discussion-sur-la-conversion-de-dplyr-à-dbplyr">Discussion sur la conversion de <code>dplyr</code> à <code>dbplyr</code></h2>
+<p>La conversion de ce traitement en <code>duckdb</code> a demandé un peu de travail essentiellement sur la partie manipulation des dates pour trouver les fonctions lubridate connues de <code>dbplyr</code>.</p>
+<div class="cell">
+
+</div>
+<p>Derrière la scène j’ai créé une table <code>table</code> avec les deux colonnes nécessaires que j’ai enregistrée dans <code>duckdb</code> dans la table <code>dates</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>dates</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 2 × 2
+  date_mise_en_cir  year
+  &lt;date&gt;           &lt;int&gt;
+1 2018-04-02        2022
+2 2020-11-29        2023</code></pre>
+</div>
+</div>
+<p>Le passage :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>dates <span class="sc">|&gt;</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">annee_mise_en_cir =</span> <span class="fu">as.numeric</span>(<span class="fu">substr</span>(date_mise_en_cir, <span class="dv">1</span>, <span class="dv">4</span>)),</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">age =</span> <span class="fu">as.numeric</span>(<span class="fu">difftime</span>(<span class="fu">as.IDate</span>(<span class="fu">paste0</span>(year,<span class="st">"-01-01"</span>)), date_mise_en_cir, <span class="at">units=</span><span class="st">"days"</span>)<span class="sc">/</span><span class="fl">365.25</span>)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 2 × 4
+  date_mise_en_cir  year annee_mise_en_cir   age
+  &lt;date&gt;           &lt;int&gt;             &lt;dbl&gt; &lt;dbl&gt;
+1 2018-04-02        2022              2018  3.75
+2 2020-11-29        2023              2020  2.09</code></pre>
+</div>
+</div>
+<p>est traduit en :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"dates"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">annee_mise_en_cir =</span> <span class="fu">year</span>(date_mise_en_cir)) <span class="sc">|&gt;</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">age =</span> (<span class="fu">as_date</span>(<span class="fu">paste0</span>(year, <span class="st">"-01-01"</span>)) <span class="sc">-</span> date_mise_en_cir ) <span class="sc">/</span> <span class="fl">365.25</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   SQL [2 x 4]
+# Database: DuckDB 0.9.0 [unknown@Linux 6.2.0-36-generic:R 4.3.2/:memory:]
+  date_mise_en_cir  year annee_mise_en_cir   age
+  &lt;date&gt;           &lt;int&gt;             &lt;dbl&gt; &lt;dbl&gt;
+1 2018-04-02        2022              2018  3.75
+2 2020-11-29        2023              2020  2.09</code></pre>
+</div>
+</div>
+<p>Mais <code>dbplyr</code> a une particularité intéressante, quand il ne comprends pas un ordre, il l’envoie tel quel à la base de données. Nous aurions pu nous appuyer sur ce mécanisme pour utiliser la fonction <code>make_date(year, month, day)</code> de <code>duckdb</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"dates"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">annee_mise_en_cir =</span> <span class="fu">year</span>(date_mise_en_cir)) <span class="sc">|&gt;</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">age =</span> (<span class="fu">make_date</span>(year, 1L, 1L) <span class="sc">-</span> date_mise_en_cir ) <span class="sc">/</span> <span class="fl">365.25</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   SQL [2 x 4]
+# Database: DuckDB 0.9.0 [unknown@Linux 6.2.0-36-generic:R 4.3.2/:memory:]
+  date_mise_en_cir  year annee_mise_en_cir   age
+  &lt;date&gt;           &lt;int&gt;             &lt;dbl&gt; &lt;dbl&gt;
+1 2018-04-02        2022              2018  3.75
+2 2020-11-29        2023              2020  2.09</code></pre>
+</div>
+</div>
+<p>Version nettement plus facile à car faisant uniquement ce qu’il faut sans <code>substr</code>, <code>paste</code> et cie.</p>
+</section>
+<section id="peut-on-utiliser-uniquement-arrow-sur-ce-traitement" class="level2">
+<h2 class="anchored" data-anchor-id="peut-on-utiliser-uniquement-arrow-sur-ce-traitement">Peut-on utiliser uniquement <code>arrow</code> sur ce traitement ?</h2>
+<p>Bien sûr, comme pour le point précédent, il y a un travail sur la conversion car <code>arrow</code> :</p>
+<ul>
+<li>ne gère pas les calculs sur les dates comme <code>dbplyr</code></li>
+<li>ne connait pas <code>base::cut()</code> qui est massivement employé.</li>
+</ul>
+<p>Sur le premier point, une seule ligne à changer par rapport à notre code <code>dbplyr</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>dates <span class="sc">%&gt;%</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">annee_mise_en_cir =</span> <span class="fu">year</span>(date_mise_en_cir),</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">age =</span> (<span class="fu">as_date</span>(<span class="fu">paste0</span>(year, <span class="st">"-01-01"</span>)) <span class="sc">-</span> date_mise_en_cir ) <span class="sc">/</span> <span class="fl">365.25</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 2 × 4
+  date_mise_en_cir  year annee_mise_en_cir age          
+  &lt;date&gt;           &lt;int&gt;             &lt;dbl&gt; &lt;drtn&gt;       
+1 2018-04-02        2022              2018 3.750856 days
+2 2020-11-29        2023              2020 2.088980 days</code></pre>
+</div>
+</div>
+<p>Arrow n’autorise pas à faire un calcul sur une différence entre deux dates, il faut donc les convertir en jours (<code>as.integer(date)</code> va donner un nombre de jours depuis le 1er janvier 1970) et ensuite on peut travailler dessus comme sur des entiers :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>dates <span class="sc">|&gt;</span> <span class="fu">as_arrow_table</span>() <span class="sc">|&gt;</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">annee_mise_en_cir =</span> <span class="fu">year</span>(date_mise_en_cir),</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">age =</span> (<span class="fu">as.integer</span>(<span class="fu">as_date</span>(<span class="fu">paste0</span>(year, <span class="st">"-01-01"</span>))) <span class="sc">-</span> <span class="fu">as.integer</span>(date_mise_en_cir)) <span class="sc">/</span> <span class="fl">365.25</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 2 × 4
+  date_mise_en_cir  year annee_mise_en_cir   age
+  &lt;date&gt;           &lt;int&gt;             &lt;int&gt; &lt;dbl&gt;
+1 2018-04-02        2022              2018  3.75
+2 2020-11-29        2023              2020  2.09</code></pre>
+</div>
+</div>
+<div class="cell">
+
+</div>
+<p>Sur le second point, on peut remplacer <code>cut</code> par un <code>case_when</code>, soit :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>poids <span class="sc">|&gt;</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">poids_vide_tr =</span> <span class="fu">cut</span>(poids_vide,</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>                      <span class="at">breaks=</span><span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">1000</span>,<span class="dv">1200</span>,<span class="dv">1500</span>,<span class="dv">1800</span>,<span class="dv">2000</span>,<span class="cn">Inf</span>),</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>                      <span class="at">include.lowest=</span><span class="cn">TRUE</span>,</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>                      <span class="at">labels=</span><span class="fu">c</span>(<span class="st">"1 - moins de 1000 kg"</span>,</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"2 - plus de 1 à 1,2 t"</span>,</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"3 - plus de 1,2 à 1,5 t"</span>,</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"4 - plus de 1,5 à 1,8 t"</span>,</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"5 - plus de 1,8 à 2 t"</span>,</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>                               <span class="st">"6 - plus de 2 t"</span>)))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 4 × 2
+  poids_vide poids_vide_tr          
+       &lt;dbl&gt; &lt;fct&gt;                  
+1         10 1 - moins de 1000 kg   
+2       3000 6 - plus de 2 t        
+3       1700 4 - plus de 1,5 à 1,8 t
+4       1300 3 - plus de 1,2 à 1,5 t</code></pre>
+</div>
+</div>
+<p>Par :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>poids <span class="sc">|&gt;</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_arrow_table</span>() <span class="sc">|&gt;</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">poids_vide_tr =</span> <span class="fu">case_when</span>(</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>      poids_vide <span class="sc">&lt;=</span> <span class="dv">1000</span> <span class="sc">~</span> <span class="st">"1 - moins de 1000 kg"</span>,</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>      poids_vide <span class="sc">&lt;=</span> <span class="dv">1200</span> <span class="sc">~</span> <span class="st">"2 - plus de 1 à 1,2 t"</span>,</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>      poids_vide <span class="sc">&lt;=</span> <span class="dv">1500</span> <span class="sc">~</span> <span class="st">"3 - plus de 1,2 à 1,5 t"</span>,</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>      poids_vide <span class="sc">&lt;=</span> <span class="dv">1800</span> <span class="sc">~</span> <span class="st">"4 - plus de 1,5 à 1,8 t"</span>,</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>      poids_vide <span class="sc">&lt;=</span> <span class="dv">2000</span> <span class="sc">~</span> <span class="st">"5 - plus de 1,8 à 2 t"</span>,</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>      poids_vide <span class="sc">&gt;</span> <span class="dv">2000</span> <span class="sc">~</span> <span class="st">"6 - plus de 2 t"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 4 × 2
+  poids_vide poids_vide_tr          
+       &lt;dbl&gt; &lt;chr&gt;                  
+1         10 1 - moins de 1000 kg   
+2       3000 6 - plus de 2 t        
+3       1700 4 - plus de 1,5 à 1,8 t
+4       1300 3 - plus de 1,2 à 1,5 t</code></pre>
+</div>
+</div>
+<p>À noter que :</p>
+<ul>
+<li>la version <code>arrow::case_when()</code> ne supporte pas l’argument <code>.default</code> de <code>dplyr::case_when()</code></li>
+<li><code>dbplyr</code> supporte également cette syntaxe et que la traduction SQL est la même que celle de <code>base::cut()</code>)</li>
+<li>je trouve la syntaxe <code>case_when()</code> plus explicite, les limites sont en face du texte correspondant</li>
+</ul>
+<p>Je laisse au lecteur le soin de convertir l’ensemble du script.</p>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>En utilisant <code>write_dataset()</code> pour écrire les données, le traitement met 80 secondes et utilise 15Go de mémoire.</p>
+</div>
+</div>
+</section>
+<section id="conclusions" class="level2">
+<h2 class="anchored" data-anchor-id="conclusions">Conclusions</h2>
+<p>Nous avons réussi à diviser d’un facteur 10 le temps de traitement et la mémoire utilisée avec un investissement en temps raisonnable et surtout en rendant le code beaucoup plus lisible. En passant, il peut être intéressant de passer par des fonctions <code>duckdb</code>.</p>
+<p>Il est même tout à fait envisageable dans le cas présent et avec les deux versions <code>duckdb</code> de traiter l’ensemble des fichiers en une seule passe. Le test montre que, en augmentant la limite de mémoire allouée à <code>duckdb</code> à 15Go, ce qui reste très raisonnable, les deux méthodes permettent de traiter d’un bloc l’ensemble des fichiers en 12min en utilisant autour de 12Go de mémoire.</p>
+<p>La version “full” <code>arrow</code> met à peu près le même temps mais consomme 150Go de mémoire en pic !</p>
+<p>Et pour finir : le traitement utilisant uniquement <code>duckdb</code> permet de mieux maîtriser la consommation mémoire au prix d’un ralentissement important quand il arrive à la limite fixée. En fixant une limite à 10Go à <code>duckdb</code> pour traiter l’ensemble des fichiers en une seule passe, le temps de traitement passe à 45 min soit 3 fois le temps qu’il faudrait pour traiter les fichiers séparément (<code>duckdb</code> écrit des données temporaires sur disque, ce qui est beaucoup plus lent que de travailler en mémoire). <strong>Pour traiter des fichiers particulièrement volumineux, il peut dont être intéressant de continuer à séparer les calculs.</strong></p>
+<div class="callout-tip callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Quand vos données sont volumineuses
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>utilisez <code>tbl()</code> ou <code>arrow::open_dataset()</code> plutôt que <code>arrow::read_parquet()</code></li>
+<li>utilisez <code>duckdb</code>/<code>dbplyr</code> ou <code>arrow</code> plutôt que <code>dplyr</code></li>
+<li>quand vous avez des jointures sur des grosses tables, utilisez <code>duckdb</code>/<code>dbplyr</code> plutôt que <code>arrow</code></li>
+<li>utilisez <code>arrow::write_dataset()</code> ou <code>COPY ... TO ...</code> plutôt <code>arrow::write_parquet()</code></li>
+<li>si ces outils repoussent (beaucoup) les limites, ils ne sont pas magiques : il peut encore être intéressant de scinder des calculs en plusieurs blocs pour les accélérer voire les rendre possibles.</li>
+</ol>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copié");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copié");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

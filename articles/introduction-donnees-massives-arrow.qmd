@@ -1,0 +1,559 @@
+---
+title: "Traiter des données massives en R avec `arrow`"
+lang: fr
+execute: 
+  cache: true
+editor: 
+  markdown: 
+    wrap: 72
+format:
+  html:
+    toc: true
+---
+
+```{r}
+#| include: false
+#| cache: false
+
+library(knitr)
+hook_output <- knit_hooks$get("output")
+knit_hooks$set(output = function(x, options) {
+  lines <- options$output.lines
+  if (is.null(lines)) {
+    return(hook_output(x, options))  # pass to default hook
+  }
+  x <- unlist(strsplit(x, "\n"))
+  more <- "..."
+  if (length(lines)==1) {        # first n lines
+    if (length(x) > lines) {
+      # truncate the output, but add ....
+      x <- c(head(x, lines), more)
+    }
+  } else {
+    x <- c(more, x[lines], more)
+  }
+  # paste these lines together
+  x <- paste(c(x, ""), collapse = "\n")
+  hook_output(x, options)
+})
+```
+
+::: callout-warning
+Chapitre en construction
+:::
+
+L'objectif de ce document est de voir comment traiter des données
+massives avec :
+
+-   le format parquet
+-   la librairie `arrow`
+-   un petit bout de la base de données embarquée `duckdb`
+
+Ces outils ne sont pas magiques, ils permettent :
+
+-   de faire des traitements impossible avant avec R
+-   d'accélérer des traitements existants (SAS ou R)
+
+Mais ils ont leurs limites aussi.
+
+<br>
+
+Par ailleurs, le présentateur a beaucoup expérimenté depuis quelques
+semaines mais n'est pas data-scientiste et a certainement loupé des
+choses.
+
+## Quelques packages utilisés
+
+```{r setup}
+#| message: false
+#| echo: true
+#| cache: false
+library(arrow)
+library(tidyverse)
+library(tictoc)
+library(fs)
+```
+
+## Travail sur une table unique
+
+Dans la suite de cette documentation, nous allons utiliser les données
+des courses de taxi new-yorkais diffusées par la ville de New York qui
+sont déjà disponibles sur le partage accessible depuis les serveurs R.
+Ce jeux de données fait 64Go et contient un peu plus d'1 milliard 600
+millions de lignes.
+
+```{r variable}
+#| cache: false
+
+taxi_dir <- "/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi"
+```
+
+```{r}
+#| echo: false
+#| output: false
+if (!file.exists(taxi_dir)) {
+  taxi_dir <- "/home/nc/travail/R/Rexploration/rdata/nyc-taxi/"
+}
+```
+
+Pour accéder aux données, nous allons utiliser `arrow::open_dataset()` :
+
+```{r table_unique, output.lines = 10}
+#| cache: false
+
+nyc_taxi <- arrow::open_dataset(taxi_dir)
+
+nyc_taxi
+```
+
+Cette fonction ne retourne pas le dataframe habituel mais un certain
+nombre d'informations comme le nombre de fichiers et le nom des champs.
+
+D'après les informations, les données sont réparties dans 158 fichiers
+différents :
+
+```{r dir_tree, output.lines=10}
+#| cache: false
+
+fs::dir_tree(taxi_dir)
+```
+
+Les fichiers sont répartis dans des sous-répertoires par années et par
+mois, nous verrons plus tard l'intérêt de cette organisation.
+
+### Exemple 1 : interagir avec les données
+
+Regardons les premières lignes des données avec la fonction `head()` :
+
+```{r head, output.lines=5}
+nyc_taxi %>%
+  head()
+```
+
+Comme pour `open_dataset()`, `head()` ne retourne pas les données
+elles-mêmes mais uniquement la liste des champs. Avec `arrow`, aucune
+opération n'est réalisée à l'ouverture d'un fichier, pour déclencher les
+calculs, vous devez utiliser la fonction `collect()` :
+
+```{r head_and_collect}
+nyc_taxi %>%
+  head() %>%
+  collect()
+```
+
+Cette façon de faire permet à la librairie `arrow` d'avoir une vision
+globale des calculs qu'elle va devoir réaliser et d'optimiser les
+opérations dans leur ensemble.
+
+### Exemple 2 : une requête simple
+
+Nous voulons calculer sur 2017, 2019 et 2021 le nombre de trajets, de
+trajets partagés et le pourcentage de trajets sur trajets partagés.
+
+Nous allons utilisez les verbes `dplyr` classiques :
+
+1.  filter() pour filtrer sur la période
+2.  group_by() pour groupper sur l'année
+3.  summarize() pour compter le nombre de trajet et de trajets partagés
+4.  mutate() pour calculer le pourcentage
+5.  collect() pour déclencher l'exécution et retourner le résultat dans
+    R
+
+```{r requete_simple}
+#| cache: false
+shared_rides <- nyc_taxi |>
+  filter(year %in% c(2017, 2019, 2021)) |> 
+  group_by(year) |>
+  summarize(
+    all_trips = n(),
+    shared_trips = sum(passenger_count > 1, na.rm = TRUE)
+  ) |>
+  mutate(pct_shared = shared_trips / all_trips * 100)
+```
+
+```{r requete_simple_2}
+shared_rides %>%
+  collect()
+```
+
+Il faut noter que, comme précédemment, aucun calcul n'est réalisé en R.
+`arrow` va convertir tous ces ordres et les exécuter en interne ce qui
+implique des limitations qu'il faut comprendre.
+
+### Exemple 3 : Limitations
+
+L'affichage est illisible, nous souhaitons afficher le résultat par
+millions de courses.
+
+```{r limit_1}
+#| cache: false
+millions <- function(x) x / 10^6
+```
+
+Nous pouvons utiliser mutate sur chaque variable concernée :
+
+```{r limit_2}
+shared_rides |>
+  mutate(
+    all_trips = millions(all_trips),
+    shared_trips = millions(shared_trips)
+  ) |>
+  collect()
+```
+
+Nous pouvons aussi essayer d'utiliser `mutate_at` :
+
+```{r limit_3, error=TRUE}
+#| error: TRUE
+shared_rides |>
+  mutate_at(c("all_trips", "shared_trips"), millions) |>
+  collect()
+```
+
+Mais certains verbes ne sont pas (encore ?) implémentés dans `arrow`.
+Une façon de faire est alors de réaliser le calcul lourd dans `arrow`
+et, une fois que le volume de données est suffisament réduit d'appliquer
+la méthode mutate_at :
+
+```{r limit_4}
+shared_rides |>
+  collect() |>
+  mutate_at(c("all_trips", "shared_trips"), millions)
+```
+
+La liste complète des verbes implémentés est disponible dans la
+[documentation de
+arrow](https://arrow.apache.org/docs/dev/r/reference/acero.html).
+
+Nous voyons que si `mutate_at()` n'est pas implémenté, `mutate()` et
+`across()` le sont, nous pourrions donc aussi écrire :
+
+```{r limit_5}
+shared_rides |>
+  mutate(across(ends_with("trips"), millions)) |>
+  collect()
+```
+
+### Quelques détails pertinents sur le format parquet
+
+Avant d'aller plus loin, revenons sur l'organisation des fichiers
+parquet. Pour cela, testons les performances de 3 requêtes avec des
+différents niveaux de filtres :
+
+```{r interet_2}
+tic()
+open_dataset(taxi_dir) %>%
+  summarize(n = n(), mean = mean(trip_distance)) %>%
+  collect() %>% invisible()
+toc()
+
+tic()
+open_dataset(taxi_dir) %>% 
+  filter(trip_distance > 200) %>% 
+  summarize(n = n(), mean = mean(trip_distance)) %>% 
+  collect() %>% invisible()
+toc()
+
+tic()
+open_dataset(taxi_dir) %>% 
+  filter(year == 2016, month == 3) %>% 
+  summarize(n = n(), mean = mean(trip_distance)) %>%
+  collect() %>% invisible()
+toc()
+```
+
+Pour comprendre ces différences de performance il faut se rappeler que :
+
+les données parquet sont organisées dans plusieurs fichiers :
+
+```{r dir_tree_2, output.lines=10}
+#| cache: false
+
+fs::dir_tree(taxi_dir)
+```
+
+Et savoir que le format parquet est organisé en colonne et non en ligne comme CSV :
+
+![](img/parquet-chunking.svg) 
+
+et enfin que chaque fichier intègre des méta-données comme les minimums et
+maximums pour chaque colonne numérique.
+
+Pour les trois requêtes précédentes :
+
+1.  Dans le premier cas, `arrow` lit tous les fichiers mais uniquement
+    la colonne `trip_distance`.
+
+2.  Dans le deuxième cas, `arrow` lit
+
+    1.  les métadonnées des fichiers et sélectionne ceux où
+        le minimum de trip_distance est supérieur à 200
+
+    2.  la colonne trip_distance uniquement dans ces fichiers
+
+3.  Dans le dernier cas `arrow` lit uniquement la colonne trip_distance
+    des fichiers du répertoire `year=2016/month=1/`
+
+::: callout-tip
+-   parquet permet facilement de lire uniquement certaines colonnes
+-   les métadonnées apportent un gain direct, sans action de votre part
+-   si vos données sont volumineuses, il est fortement recommandé de partitionner
+-   il y a dans tous les cas peu de perte à partitionner, au pire ça ne
+    sert à rien.
+:::
+
+### lire des données "non parquet"
+
+`arrow` permet évidemment de manipuler des données "non parquet". 
+
+Pour un fichier CSV, on peut aussi utiliser la fonction
+`arrow::read_csv_arrow()` avec l'argument `as_data_frame` à `FALSE` :
+
+```{r lire_csv}
+read_csv_arrow(file.path(taxi_dir, "../taxi+_zone_lookup.csv"),
+               as_data_frame = FALSE)
+
+```
+La
+première solution permet de convertir n'importe quel data.frame/tibble :
+
+1.  charger les données dans un data.frame
+2.  convertir le data.frame au format `arrow`
+
+```{r lire_non_parquet}
+readr::read_csv(file.path(taxi_dir, "../taxi+_zone_lookup.csv")) %>%
+  as_arrow_table()
+```
+
+
+### Exemple 4 : au delà de dplyr
+
+`arrow` implémente également des verbes de `lubridate` et `stringr`.
+
+Nous pouvons par exemple calculer la moyenne du nombre de passagers par jour de
+la semaine et par année :
+
+```{r lubridate}
+open_dataset(taxi_dir) %>%
+  mutate(weekday = wday(pickup_datetime, label = FALSE)) %>%
+  group_by(year, weekday) %>%
+  summarize(moyenne_pass = mean(passenger_count, na.rm = TRUE)) %>%
+  collect() %>%
+  arrange(year, weekday) %>%
+  pivot_wider(names_from = weekday, values_from = moyenne_pass)
+```
+
+## Et les jointures dans tout ça ?
+
+Les courses de taxi intègre une colonne pickup_location_id et
+dropoff_location_id et le fichier `taxi+_zone_lookup.csv` donne la correspondance
+entre cet identifiant et le nom.
+
+### Exemple : attention aux pièges
+
+Chargeons le fichier en faisant un peu de nettoyage sur les noms de variables :
+
+```{r, lit_csv_2}
+taxi_zones <- readr::read_csv(file.path(taxi_dir, "../taxi+_zone_lookup.csv")) %>%
+  select(
+    pickup_location_id = LocationID,
+    borough = Borough
+  )
+taxi_zones
+```
+
+Essayons de faire la jointure sur la colonne pickup_location_id :
+
+```{r piege_1, error = TRUE}
+open_dataset(taxi_dir) %>%
+  left_join(taxi_zones) |>
+  collect()
+```
+
+`arrow` est pointilleux sur les types de données et en l'occurence, pickup_location_id est de type int64 dans la les courses et de type double dans la table des zones.
+
+Pour contourner ce piège, nous allons devoir passer un schéma pour forcer le type de `LocationID` :
+
+```{r creation_tables_annexes}
+#| cache: false
+
+taxi_zones <- readr::read_csv(file.path(taxi_dir, "../taxi+_zone_lookup.csv")) %>%
+  select(
+    location_id = LocationID,
+    borough = Borough
+  ) |>
+  as_arrow_table(
+    schema = schema(
+      location_id = int64(),
+      borough = utf8()
+    )
+  )
+```
+
+A partir de cet objet `arrow`, nous allons créer deux objets dédiés à la jointure sur la zone de prise en charge et de dépose :
+
+```{r creation_tables_annexes_2}
+#| cache: false
+pickup <- taxi_zones |>
+  select(
+    pickup_location_id = location_id,
+    pickup_borough = borough
+  )
+
+dropoff <- taxi_zones |>
+  select(
+    dropoff_location_id = location_id,
+    dropoff_borough = borough
+  )
+
+```
+
+Et on peut maintenant utiliser ces objets directement :
+
+```{r borough}
+tic()
+borough_counts <- nyc_taxi |>
+  filter(year == 2016) |>
+  left_join(pickup) |>
+  left_join(dropoff) |>
+  count(pickup_borough, dropoff_borough) |>
+  arrange(desc(n)) |>
+  collect()
+
+borough_counts
+toc()
+```
+
+## Quand `arrow` ne sait pas faire le job
+
+Nous avons vu que `arrow` n'avait pas une couverture complète des verbes de
+`dplyr`. Certaines fonctions sont implémentées de façon "partielle" (par exemple
+la médiane est une approximation) tandis que d'autres ne le sont pas du tout
+comme les fonctions de fenêtre (row_number, ...).
+
+Prenons un exemple (totalement absurde) : on recherche, sur l'année 2018, toutes
+les courses dont le "rang" contient 59, qui ont commencé à la minute 59 et la
+seconde 59 et nous voulons extraire le "magic_number" qui supprime tous les
+chiffres autre que 5 et 9 du rang de la course :
+
+```{r row_number}
+#| cache: false
+nyc_taxi_2018 <- open_dataset(file.path(taxi_dir, "year=2018/"))
+
+nyc_taxi_2018 %>% nrow()
+```
+
+Ces données font plus de 100 millions de lignes, ce qui commence à être compliqué à traiter avec `dplyr`. Essayons avec `arrow` :
+
+```{r row_number_2, error = TRUE}
+
+nyc_taxi_2018 %>%
+  mutate(trip_id = row_number()) |>
+  filter(
+    trip_id |> as.character() |> str_detect("59"),
+    second(pickup_datetime) == 59,
+    minute(pickup_datetime) == 59
+  ) |> 
+  mutate(
+    magic_number = trip_id |> 
+      as.character() |> 
+      str_remove_all("[^59]") |>
+      as.integer()
+  ) |>
+  select(trip_id, magic_number, pickup_datetime) |>
+  collect()
+```
+
+`arrow`, très poliment, nous explique que `row_number()` n'est pas supporté, une
+solution dans ce cas là est d'utiliser les librairies `duckdb` et `dbplyr` :
+
+```{r setup_2}
+#| message: false
+#| echo: true
+#| cache: false
+library(duckdb)
+library(dbplyr)
+```
+
+`arrow` et `duckdb` savent se parler très efficacement avec les fonctions
+`arrow::to_arrow()` et `arrow::to_duckdb()` qui ne passent pas les données
+proprement dite mais juste un pointeur sur les données `arrow` :
+
+```{r row_number_3}
+tic()
+nyc_taxi_2018 %>%
+  to_duckdb() |>  
+  window_order(pickup_datetime) |>  
+  mutate(trip_id = row_number()) |>
+  filter(
+    trip_id |> as.character() |> str_detect("59"),
+    second(pickup_datetime) == 59,
+    minute(pickup_datetime) == 59
+  ) |> 
+  mutate(
+    magic_number = trip_id |> 
+      as.character() |> 
+      str_remove_all("[^59]") |>
+      as.integer()
+  ) |>
+  select(trip_id, magic_number, pickup_datetime) |>
+  collect()
+toc()
+```
+
+
+## Quelques conclusions temporaires
+
+### Limitations de `arrow`
+
+`arrow` est un outil de manipulation de données qui excelle dans les jointures,
+filtre, summmarize... Il n'est pas (forcément) adapté aux traitements
+statistiques tels que régression, tirages pondérés dans un échantillon...
+
+### jointures entre des grosses tables
+
+Sur des « grosses » jointure `arrow` va essayer de charger en mémoire les
+données (et généralement planter). Nous verrons plus en profondeur dans une
+prochaine session l'utilisation de `duckdb` pour ces cas là.
+
+### `arrow` n'a pas forcément le même comportement que `dplyr`
+
+Et en particulier `arrow` est plus strict que le `tidyverse` standard :
+
+-   certains "petits trucs sales" en R ne passent pas (sommer des
+booleens)
+-   le typage est important, impossible de faire un `filter` avec un
+chiffre si le champs est une string.
+-   la recherche peut poser problème `dplyr` accepte les regexp comme
+\[:punct:\] (qui ne sont normalement pas valides), pour `arrow` il faudra utiliser
+\[\[:punct:\]\]
+-   surtout ne pas réutiliser r-base
+
+Quand vous convertissez un traitement de `dplyr` vers `arrow`, faites des tests :
+
+1. sur quelques lignes et comparer les deux sorties.
+2. sur les agrégats entre les deux méthodes.
+
+Précautions : faire des tests sur les fonctions `lubridate` et `stringr`
+implémentée en arrow : essayer sur les ponctuations avec regexp
+(Attention au conversion de dates avec `lubridate` récupération d'un NA,
+calcul de max de date).
+
+### une librairie encore jeune
+
+`arrow` est une librairie encore jeune, une nouvelle version sort tous les 2/3
+mois avec beaucoup d'évolutions et d'améliorations.
+
+## Pour approfondir `arrow`
+
+-   L'excellent [tutorial donné à
+    User2022](https://arrow-user2022.netlify.app/) (dont je me suis largement inspiré)
+-   La [documentation officielle](https://arrow.apache.org/docs/r/) de
+    `arrow`
+-   La [liste complète des verbes
+    `tidyverse`](https://arrow.apache.org/docs/r/reference/acero.html)
+    supportés par `arrow`
+
+## La suite
+
+prochaine séance dédiée à `duckdb`

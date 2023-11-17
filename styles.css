@@ -1,0 +1,14 @@
+/* css styles */
+.sidebar-item-text {
+    font-weight: bold;
+}
+h1 {
+  color: blue;
+  background-color: yellow;
+  border: 1px solid black;
+}
+div {
+  color: blue;
+  background-color: yellow;
+  border: 1px solid black;
+}

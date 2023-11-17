@@ -1,0 +1,28 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "big data & R"
+  site-url: https://nbc.gitlab-pages.din.developpement-durable.gouv.fr/big-data/docs
+  sidebar:
+    style: "docked"
+    page-navigation: true
+    search: true
+    contents:
+      - href: index.qmd
+        text: "Les outils big data de R"
+      - section: "Quelques documents en vracs"
+        contents:
+          - href: articles/introduction-donnees-massives-arrow.qmd
+            text: "Introduction à arrow"
+          - href: articles/introduction-duckdb.qmd
+            text: "Introduction à duckdb"
+          - href: articles/cas-pratique-traitement-duckdb.qmd
+            text: "Un exemple de conversion a duckdb"
+          - href: articles/conversion-fichier-sas.qmd
+            text: "Notes sur la conversion de fichiers SAS"
+      - section: "Présentations"
+        contents:
+          - href: articles/presentation_insee.qmd
+            text: "REX SDES - Présentation INSEE"

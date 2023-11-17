@@ -1,0 +1,603 @@
+---
+title: "Cas pratique d'une migration d'un traitement vers duckdb"
+lang: fr
+format:
+  html:
+    toc: true
+---
+
+## Présentation du cas
+
+Ce cas pratique vient du transport. Il sert à préparer des fichiers d'étude à
+partir de deux jeux de données :
+
+* vehicule : les propriétés  d'un véhicule (immat, cylindrée, énergie, date de mise en circulation...) fait 70 millions de lignes
+* annee : les évènements liés à un véhicule par année (km parcouru, présence dans le parc... ) fait 490 millions de lignes
+
+Et d'une troisième table de 50 lignes avec la nomenclature des carburants.
+
+Dans le code d'origine, afin de tenir sur le serveur, les données vehicule et
+annee d'origine sont partitionnées à la main en 10 fichiers véhicules et 10
+fichiers années correspondants pour générer 10 fichiers d'étude.
+
+Le traitement actuel est le suivant :
+
+1. charge deux fichiers de données parquet en mémoire avec `arrow::read_parquet()
+1. fait une jointure entre les deux fichiers de données avec `dplyr`
+1. ajoute des colonnes calculées toujours avec `dplyr` (année de mise en circulation à partir de la date, la quantité de CO2 émise par tranche...)
+1. écrit le fichier résultat
+
+Notre cas pratique reprend uniquement la génération d'un fichier d'étude sur les 10.
+
+Dans le suite, nous allons rapidement présenter le code d'origine et voir les
+différentes évolutions possibles.
+
+## Le code d'origine
+
+Le programme d'origine utilise `arrow` uniquement pour la lecture des données au
+format parquet. Les calculs sont réalisés avec `dplyr`.
+
+```{r pas_a_pas_duckdb_1, eval = FALSE}
+library("arrow")
+library("dplyr")
+library("readxl")
+library("writexl")
+library(tictoc)
+library("data.table")
+
+
+chemin_donnees_sources <- "/home/nc/projet/Parc/"
+
+grille_carbu <- subset(
+  read_xlsx("/home/nc/projet/Nomenclature/Vehicule/nomenclature_carburant_mai_2022.xlsx"),
+  select=c(carbu_simpl,carbu_det,energ))
+
+### Boucle pour préparer et exporter toutes les tables data_etude_0 à data_etude_9. ###
+
+data <- left_join(read_parquet(paste0(chemin_donnees_sources,"data_annee_VP_0.parquet"),
+                               col_select = c("id","year","parc_01_01","parcm","km")),
+                  read_parquet(paste0(chemin_donnees_sources,"data_vehicule_VP_0.parquet"),
+                               col_select = c("id","date_mise_en_cir","energ","co2_theorique",
+                                              "puis_kw","poids_vide","crit_air","conso_reelle",
+                                              "co2_reel"))
+                  ,by="id") %>%
+  filter(year>=2012) %>%
+  mutate(
+    poids_vide_tr = cut(poids_vide,
+                        breaks=c(min(poids_vide,na.rm=TRUE),1000,1200,1500,1800,2000,
+                                 max(poids_vide,na.rm=TRUE)),
+                        include.lowest=TRUE,
+                        labels=c("1 - moins de 1000 kg",
+                                 "2 - plus de 1 à 1,2 t",
+                                 "3 - plus de 1,2 à 1,5 t",
+                                 "4 - plus de 1,5 à 1,8 t",
+                                 "5 - plus de 1,8 à 2 t",
+                                 "6 - plus de 2 t")),
+    annee_mise_en_cir = as.numeric(substr(date_mise_en_cir,1,4)),
+    age = as.numeric(difftime(as.IDate(paste0(year,"-01-01")),date_mise_en_cir,units="days")/365.25),
+    age_tr = cut(age,
+                 breaks=c(min(age,na.rm=TRUE),2,5,10,15,20,25,max(age,na.rm=TRUE)),
+                 include.lowest=TRUE,
+                 labels=c("1 - moins de 2 ans",
+                          "2 - plus de 2 à 5 ans",
+                          "3 - plus de 5 à 10 ans",
+                          "4 - plus de 10 à 15 ans",
+                          "5 - plus de 15 à 20 ans",
+                          "6 - plus de 20 à 25 ans",
+                          "7 - plus de 25 ans")),
+    co2_reel = as.numeric(co2_reel),
+    co2_reel_tr = cut(co2_reel,
+                      breaks=c(min(co2_reel,na.rm=TRUE),125,150,175,200,max(co2_reel,na.rm=TRUE)),
+                      include.lowest=TRUE,
+                      labels=c("1 - moins de 125 g/km",
+                               "2 - plus de 125 à 150 g/km",
+                               "3 - plus de 150 à 175 g/km",
+                               "4 - plus de 175 à 200 g/km",
+                               "5 - plus de 200 g/km")),
+    co2_reel_tr = ifelse(crit_air=="E","0 - véhicule électrique",co2_reel_tr),
+    co2_reel_tr = ifelse(is.na(co2_reel_tr),"NA - inconnu",co2_reel_tr),
+    co2_theorique = as.numeric(co2_theorique),
+    co2_theorique_tr = cut(co2_theorique,
+                           breaks=c(min(co2_theorique,na.rm=TRUE),125,150,175,200,
+                                    max(co2_theorique,na.rm=TRUE)),
+                           include.lowest=TRUE,
+                           labels=c("1 - moins de 125 g/km",
+                                    "2 - plus de 125 à 150 g/km",
+                                    "3 - plus de 150 à 175 g/km",
+                                    "4 - plus de 175 à 200 g/km",
+                                    "5 - plus de 200 g/km")),
+    co2_theorique_tr = ifelse(crit_air=="E","0 - véhicule électrique",co2_theorique_tr),
+    co2_theorique_tr = ifelse(is.na(co2_theorique_tr),"NA - inconnu",co2_theorique_tr),
+    puis_kw_tr = cut(puis_kw,
+                     breaks=c(min(puis_kw,na.rm=TRUE),55,70,85,100,max(puis_kw,na.rm=TRUE)),
+                     include.lowest=TRUE,
+                     labels=c("1 - moins de 55 kw",
+                              "2 - plus de 55 à 70 kw",
+                              "3 - plus de 70 à 85 kw",
+                              "4 - plus de 85 à 100 kw",
+                              "5 - plus de 100 kw")),
+    puis_kw_tr = ifelse(is.na(puis_kw_tr),"NA - inconnu",puis_kw_tr)
+  ) %>%
+
+  left_join(grille_carbu,by="energ") %>%
+
+  mutate(
+    carbu_agreg = ifelse(carbu_det %in% c("Diesel","Biodiesel","Diesel HNR","Diesel HR"),
+                         "Diesel (y compris hybrides)",
+                         "Essence et autres énergies"),
+    carbu_agreg2 = ifelse(carbu_simpl %in% c("Diesel","Essence"),
+                          "Diesel et Essence thermiques",
+                          "Autres énergies")
+  )
+
+write_parquet(data, "origine.parquet")
+```
+
+::: {.callout-note}
+Le code fonctionne parfaitement et le temps de traitement est de l'ordre de
+15min pour une consommation en pic 25Go de mémoire.
+:::
+
+Il pourrait certainement être optimisé, le `mutate` réalisé à la fin pourrait
+l'être directement sur la table grille_carbu au début pour éviter de devoir
+modifier les millions de lignes mais ça restera de l'optimisation à la marge (test
+fait, le traitement passe à 12min).
+
+Les principaux problèmes de ce code, (écrit à une époque ou `arrow` n'était pas
+encore vraiment utilisable sur nos serveurs) sont que :
+
+* les données sont entièrement chargées en mémoire par `arrow::read_parquet()`
+* les calculs sont réalisés par `dplyr` qui n'est pas connu pour être rapide
+
+Si ça ne pose pas de problème sur quelques milliers voire centaines de milliers
+de lignes, ça devient rédhibitoire quand on croise des dizaines de millions de
+lignes.
+
+## Première étape : utilisation de `duckdb` et `dplyr`
+
+Dans cette première étape, nous allons essayer d'éviter de charger les données
+dans R et, surtout, de faire la jointure en mémoire. Pour cela nous allons lire
+les données avec `duckdb` et les traiter avec `dplyr` qui, en sous-main, va
+utiliser `dbplyr` (la version de `dplyr` pour les bases de données).
+
+
+### L'initialisation
+
+Nous allons commencer par charger les packages nécessaires et on créé une
+variable avec les chemins :
+
+```{r pas_a_pas_duckdb_2, eval = FALSE}
+library(arrow)
+library(dplyr)
+library(readxl)
+library(duckdb)
+library(tidyverse)
+library(lubridate)
+library(tictoc)
+
+chemin_donnees_sources <- "/home/nc/projet/Parc/Parc_2022/Donnees_individuelles/"
+```
+
+Puis nous créons une base de données dans le fichier `test.duckdb`, on limite la
+mémoire à 10Go et le nombre de CPU utilisé à 4 pour ne pas écrouler le serveur.
+
+
+```{r pas_a_pas_duckdb_2_1, eval = FALSE}
+con <- DBI::dbConnect(duckdb(), dbdir = "test.duckdb",            
+                      config=list("memory_limit"="10GB",
+                                  "threads=4"))
+```
+
+### Création des tables de base de données à utiliser
+
+Le référentiel des carburants n'étant pas un fichier parquet, on écrit les
+données dans la base avec la commande `DBI::dbWriteTable()`
+
+On créé les objets `vehicule`, `annee` et `grille_carbu` avec `dplyr::tbl()`,
+cette fonction transforme une table de base de données ou un fichier parquet en
+objet utilisable par `dplyr`.
+
+
+```{r pas_a_pas_duckdb_3, eval = FALSE}
+read_xlsx("/home/nc/projet/Nomenclature/Vehicule/nomenclature_carburant_mai_2022.xlsx") |>
+  select(carbu_simpl,carbu_det,energ) |>
+  dbWriteTable(con, "grille_carbu", value = _, overwrite = TRUE)
+grille_carbu <- tbl(con, "grille_carbu")
+
+vehicule <- tbl(con, file.path(chemin_donnees_sources, "data_vehicule_VP_0.parquet")) %>%
+  select(id, date_mise_en_cir,energ, co2_theorique,puis_kw,poids_vide,crit_air,conso_reelle,co2_reel)
+
+annee <- tbl(con, file.path(chemin_donnees_sources, "data_annee_VP_0.parquet")) %>%
+  select(id, year, parc_01_01, parcm, km)
+```
+
+### Création de la requête `dbplyr`
+
+J'ai pris le parti de modifier le code d'origine à minima pour qu'il fonctionne
+avec `dbplyr`, les modifications sont à trois niveaux :
+
+* changer les bornes des `cut` pour les passer à `0` et `Inf` plutôt que de calculer les min et max
+* utiliser `lubridate::year()` plutôt que `as.numeric(substr(date_mise_en_cir,1,4))` (ligne 5)
+* utiliser `lubridate::as_date()` pour calculer l'age du véhicule (ligne 6)
+
+
+```{r pas_a_pas_duckdb_4, eval = FALSE}
+#| code-line-numbers: true
+request <- vehicule %>%
+  right_join(annee, by = c("id")) %>%
+  filter(year >= 2012) %>%
+  mutate(
+    annee_mise_en_cir = year(date_mise_en_cir),
+    age = (as_date(paste0(year, "-01-01")) - date_mise_en_cir ) / 365.25,
+    poids_vide_tr = cut(poids_vide,
+                      breaks=c(0,1000,1200,1500,1800,2000,Inf),
+                      include.lowest=TRUE,
+                      labels=c("1 - moins de 1000 kg",
+                               "2 - plus de 1 à 1,2 t",
+                               "3 - plus de 1,2 à 1,5 t",
+                               "4 - plus de 1,5 à 1,8 t",
+                               "5 - plus de 1,8 à 2 t",
+                               "6 - plus de 2 t")),
+    age_tr = cut(age,
+                 breaks=c(0,2,5,10,15,20,25,Inf),
+                 include.lowest=TRUE,
+                 labels=c("1 - moins de 2 ans",
+                          "2 - plus de 2 à 5 ans",
+                          "3 - plus de 5 à 10 ans",
+                          "4 - plus de 10 à 15 ans",
+                          "5 - plus de 15 à 20 ans",
+                          "6 - plus de 20 à 25 ans",
+                          "7 - plus de 25 ans")),
+    co2_reel_tr = cut(co2_reel,
+                      breaks=c(0,100,130,140,155,175,200,Inf),
+                      include.lowest=TRUE,
+                      labels=c("1 - moins de 123 g/km",
+                               "2 - plus de 123 à 138 g/km",
+                               "3 - plus de 138 à 165 g/km",
+                               "4 - plus de 165 à 190 g/km",
+                               "5 - plus de 190 à 213 g/km",
+                               "6 - plus de 213 à 226 g/km",
+                               "7 - plus de 226 g/km")),
+    co2_reel_tr = ifelse(crit_air=="E","0 - véhicule électrique",co2_reel_tr),
+    co2_reel_tr = ifelse(is.na(co2_reel_tr),"NA - inconnu",co2_reel_tr),
+    co2_theorique_tr = cut(co2_theorique,
+                           breaks=c(0,123,138,165,190,213,226,Inf),
+                           include.lowest=TRUE,
+                           labels=c("1 - moins de 123 g/km",
+                                    "2 - plus de 123 à 138 g/km",
+                                    "3 - plus de 138 à 165 g/km",
+                                    "4 - plus de 165 à 190 g/km",
+                                    "5 - plus de 190 à 213 g/km",
+                                    "6 - plus de 213 à 226 g/km",
+                                    "7 - plus de 226 g/km")),
+    co2_theorique_tr = ifelse(crit_air=="E","0 - véhicule électrique",co2_theorique_tr),
+    co2_theorique_tr = ifelse(is.na(co2_theorique_tr),"NA - inconnu",co2_theorique_tr),
+    puis_kw_tr = cut(puis_kw,
+                     breaks=c(0,55,70,85,100,Inf),
+                     include.lowest=TRUE,
+                     labels=c("1 - moins de 55 kw",
+                              "2 - plus de 55 à 70 kw",
+                              "3 - plus de 70 à 85 kw",
+                              "4 - plus de 85 à 100 kw",
+                              "5 - plus de 100 kw"))
+    ) %>%
+  left_join(grille_carbu, by = "energ") %>%
+  mutate(
+    carbu_agreg = ifelse(carbu_det %in% c("Diesel","Biodiesel","Diesel HNR","Diesel HR"),
+                         "Diesel (y compris hybrides)",
+                         "Essence et autres énergies"),
+    carbu_agreg2 = ifelse(carbu_simpl %in% c("Diesel","Essence"),
+                          "Diesel et Essence thermiques",
+                          "Autres énergies")
+  )
+```
+
+Cette commande retourne (quasiment) immédiatement car à ce stade, l'objet request
+n'est pas encore évalué, on parle de "lazy evaluation", il contient juste les
+ordres à passer.
+
+### on exécute la requête
+
+La requête est effectivement exécuté au moment de la commande `write_parquet()`,
+`dbplyr` va alors transformer tous les ordres en SQL et les envoyer à la base de
+données.
+
+```{r pas_a_pas_duckdb_5, eval = FALSE}
+request %>%
+  to_arrow() %>%
+  write_parquet("dbplyr.parquet")
+```
+
+::: {.callout-note}
+Ce code prend autour de 150 secondes et consomme au pic 15/16Go de mémoire.
+:::
+
+::: {.callout-tip}
+La limite à 10Go de `duckdb` ne fonctionne visiblement pas, pourquoi ? 
+
+Une partie de la mémoire est utilisée par `arrow` au moment de la
+matérialisation et, évidemment, les limites fixées à `duckdb` ne peuvent pas
+s'appliquer sur `arrow`.
+:::
+
+## Dernière étape d'optimisation
+
+Peut-on aller plus loin ? Oui mais pour ça il faut éviter de matérialiser les
+données.
+
+Il y a deux solutions :
+
+### La solution `arrow::write_dataset()`
+
+La première solution est d'utiliser `arrow::write_dataset()` à la place de
+`arrow::write_parquet()`. 
+
+En effet, contrairement à `write_parquet()`, `write_dataset()` sait lire les
+données envoyées par la requête `dbplyr` au fur et à mesure tandis que
+`write_parquet` a besoin de la totalité des données pour les écrire.
+
+Changer les dernières lignes `write_dataset()` a un impact majeur :
+
+```{r pas_a_pas_duckdb_6, eval = FALSE}
+request %>%
+  to_arrow() %>%
+  write_dataset("dbplyr_parquet")
+```
+
+::: {.callout-note}
+Ce code prend autour de 100 secondes et consomme au pic 2Go de mémoire.
+:::
+
+### La solution "full" `duckdb`
+
+La seconde solution est d'utiliser la commande native de `duckdb` pour générer
+les fichiers parquet : [`COPY ... TO
+...`](https://duckdb.org/docs/sql/statements/copy.html)
+
+Si vous êtes expert en SQL vous pouvez convertir mais ça n'est pas mon cas alors
+nous allons utiliser la fonction `dbplyr::sql_render()` et utiliser directement
+le SQL généré par `dbplyr` :
+
+```{r pas_a_pas_duckdb_9, eval = FALSE}
+sql <- request %>% 
+  dbplyr::sql_render(con = con)
+```
+
+La variable `sql` contient une requête :
+
+```{SQL pas_a_pas_duckdb_10, eval = FALSE}
+<SQL>
+SELECT
+  *,
+  CASE WHEN (carbu_det IN ('Diesel', 'Biodiesel', 'Diesel HNR', 'Diesel HR')) THEN 'Diesel (y compris hybrides)' WHEN NOT (carbu_det IN ('Diesel', 'Biodiesel', 'Diesel HNR', 'Diesel HR')) THEN 'Essence et autres énergies' END AS carbu_agreg,
+  CASE WHEN (carbu_simpl IN ('Diesel', 'Essence')) THEN 'Diesel et Essence thermiques' WHEN NOT (carbu_simpl IN ('Diesel', 'Essence')) THEN 'Autres énergies' END AS carbu_agreg2
+FROM (
+  SELECT
+    *,
+    CASE
+WHEN (puis_kw <= 55.0) THEN '1 - moins de 55 kw'[...]
+[...]
+```
+
+Le SQL est "brutal" mais :
+
+* nous ne sommes pas à un concours de beau code
+* l'optimisation c'est le boulot de `duckdb`
+
+Nous allons enfin utiliser le SQL généré pour écrire le fichier :
+
+```{r pas_a_pas_duckdb_12, eval = FALSE}
+dbExecute(con, glue::glue("COPY ({DBI::SQL(request)}) TO 'test2.parquet'"))
+```
+
+Et alors ?
+
+::: {.callout-note}
+Ce code prend également autour de 100 secondes et consomme 1,7Go de mémoire en pic.
+:::
+
+On aurait aussi pu partitionner par exemple sur `year` si cette variable était
+beaucoup utilisée pour des `filter` :
+
+```{r pas_a_pas_duckdb_13, eval = FALSE}
+dbExecute(con, glue::glue("COPY ({DBI::SQL(request)}) 
+                          TO 'dataset_par_annee' (FORMAT PARQUET, PARTITION_BY (year))"))
+```
+
+On peut noter également que le fichier parquet généré par `duckdb` est 20% plus
+gros que celui de `arrow` (730Go contre 600).
+
+Nous venons de passer le traitement de 15min et plus de 25Go à 100s et 1,7 ou
+2Go. On peut s'arrêter là pour aujourd'hui non ?
+
+## Discussion sur la conversion de `dplyr` à `dbplyr`
+
+La conversion de ce traitement en `duckdb` a demandé un peu de travail
+essentiellement sur la partie manipulation des dates pour trouver les fonctions
+lubridate connues de `dbplyr`.
+
+```{r date_1}
+#| echo: false
+#| output: false
+#| cache: false
+library("arrow")
+library("dplyr")
+library(tictoc)
+library("data.table")
+library(duckdb)
+library(lubridate)
+
+dates <- tibble(
+  date_mise_en_cir = ymd(c("2018-04-02", "2020-11-29")),
+  year = c(2022L, 2023L)
+)
+
+con <- dbConnect(duckdb())
+duckdb_register(con, "dates", df = dates, overwrite = TRUE)
+```
+
+Derrière la scène j'ai créé une table `table` avec les deux colonnes nécessaires
+que j'ai enregistrée dans `duckdb` dans la table `dates` :
+
+```{r date_2}
+dates
+``` 
+
+Le passage : 
+
+```{r date_3}
+dates |>
+  mutate(
+    annee_mise_en_cir = as.numeric(substr(date_mise_en_cir, 1, 4)),
+    age = as.numeric(difftime(as.IDate(paste0(year,"-01-01")), date_mise_en_cir, units="days")/365.25)
+  )
+```
+
+est traduit en :
+
+```{r date_4}
+tbl(con, "dates") |>
+  mutate(annee_mise_en_cir = year(date_mise_en_cir)) |>
+  mutate(age = (as_date(paste0(year, "-01-01")) - date_mise_en_cir ) / 365.25)
+```
+
+Mais `dbplyr` a une particularité intéressante, quand il ne comprends pas un
+ordre, il l'envoie tel quel à la base de données. Nous aurions pu nous appuyer
+sur ce mécanisme pour utiliser la fonction `make_date(year, month, day)` de
+`duckdb` :
+
+```{r date_5}
+tbl(con, "dates") |>
+  mutate(annee_mise_en_cir = year(date_mise_en_cir)) |>
+  mutate(age = (make_date(year, 1L, 1L) - date_mise_en_cir ) / 365.25)
+```
+
+Version nettement plus facile à car faisant uniquement ce qu'il faut sans
+`substr`, `paste` et cie.
+
+## Peut-on utiliser uniquement `arrow` sur ce traitement ?
+
+Bien sûr, comme pour le point précédent, il y a un travail sur la conversion car
+`arrow` :
+
+* ne gère pas les calculs sur les dates comme `dbplyr`
+* ne connait pas `base::cut()` qui est massivement employé.
+
+Sur le premier point, une seule ligne à changer par rapport à notre code
+`dbplyr` :
+
+```{r arrow_2}
+dates %>%
+  mutate(
+    annee_mise_en_cir = year(date_mise_en_cir),
+    age = (as_date(paste0(year, "-01-01")) - date_mise_en_cir ) / 365.25
+  )
+```
+
+Arrow n'autorise pas à faire un calcul sur une différence entre deux dates, il
+faut donc les convertir en jours (`as.integer(date)` va donner un nombre de
+jours depuis le 1er janvier 1970) et ensuite on peut travailler dessus comme sur
+des entiers :
+
+```{r arrow_3}
+dates |> as_arrow_table() |>
+  mutate(
+    annee_mise_en_cir = year(date_mise_en_cir),
+    age = (as.integer(as_date(paste0(year, "-01-01"))) - as.integer(date_mise_en_cir)) / 365.25
+  ) |>
+  collect()
+```
+
+```{r arrow_4}
+#| cache: false
+#| output: false
+#| echo: false
+poids <- tibble(
+  poids_vide = c(10, 3000, 1700, 1300)
+)
+```
+
+Sur le second point, on peut remplacer `cut` par un `case_when`, soit :
+
+```{r arrow_5}
+poids |>
+  mutate(
+    poids_vide_tr = cut(poids_vide,
+                      breaks=c(0,1000,1200,1500,1800,2000,Inf),
+                      include.lowest=TRUE,
+                      labels=c("1 - moins de 1000 kg",
+                               "2 - plus de 1 à 1,2 t",
+                               "3 - plus de 1,2 à 1,5 t",
+                               "4 - plus de 1,5 à 1,8 t",
+                               "5 - plus de 1,8 à 2 t",
+                               "6 - plus de 2 t")))
+```
+
+Par :
+
+```{r arrow_6}
+poids |>
+  as_arrow_table() |>
+  mutate(
+    poids_vide_tr = case_when(
+      poids_vide <= 1000 ~ "1 - moins de 1000 kg",
+      poids_vide <= 1200 ~ "2 - plus de 1 à 1,2 t",
+      poids_vide <= 1500 ~ "3 - plus de 1,2 à 1,5 t",
+      poids_vide <= 1800 ~ "4 - plus de 1,5 à 1,8 t",
+      poids_vide <= 2000 ~ "5 - plus de 1,8 à 2 t",
+      poids_vide > 2000 ~ "6 - plus de 2 t")) |>
+  collect()
+```
+
+À noter que :
+
+* la version `arrow::case_when()` ne supporte pas l'argument `.default` de `dplyr::case_when()`
+* `dbplyr` supporte également cette syntaxe et que la traduction SQL est la même que celle de `base::cut()`)
+* je trouve la syntaxe `case_when()` plus explicite, les limites sont en face du texte correspondant
+
+Je laisse au lecteur le soin de convertir l'ensemble du script. 
+
+::: {.callout-note}
+En utilisant `write_dataset()` pour écrire les données, le traitement met 80
+secondes et utilise 15Go de mémoire.
+:::
+
+## Conclusions
+
+Nous avons réussi à diviser d'un facteur 10 le temps de traitement et la mémoire
+utilisée avec un investissement en temps raisonnable et surtout en rendant le
+code beaucoup plus lisible. En passant, il peut être intéressant de passer par
+des fonctions `duckdb`.
+
+Il est même tout à fait envisageable dans le cas présent et avec les deux
+versions `duckdb` de traiter l'ensemble des fichiers en une seule passe. Le test
+montre que, en augmentant la limite de mémoire allouée à `duckdb` à 15Go, ce qui
+reste très raisonnable, les deux méthodes permettent de traiter d'un bloc
+l'ensemble des fichiers en 12min en utilisant autour de 12Go de mémoire.
+
+La version "full" `arrow` met à peu près le même temps mais consomme 150Go de
+mémoire en pic !
+
+Et pour finir : le traitement utilisant uniquement `duckdb` permet de mieux
+maîtriser la consommation mémoire au prix d'un ralentissement important quand il
+arrive à la limite fixée. En fixant une limite à 10Go à `duckdb` pour traiter
+l'ensemble des fichiers en une seule passe, le temps de traitement passe à 45
+min soit 3 fois le temps qu'il faudrait pour traiter les fichiers séparément
+(`duckdb` écrit des données temporaires sur disque, ce qui est beaucoup plus
+lent que de travailler en mémoire). **Pour traiter des fichiers particulièrement
+volumineux, il peut dont être intéressant de continuer à séparer les calculs.**
+
+:::callout-tip
+## Quand vos données sont volumineuses
+
+1. utilisez `tbl()` ou `arrow::open_dataset()` plutôt que
+`arrow::read_parquet()`
+1. utilisez `duckdb`/`dbplyr` ou `arrow` plutôt que `dplyr`
+1. quand vous avez des jointures sur des grosses tables, utilisez
+`duckdb`/`dbplyr` plutôt que `arrow`
+1. utilisez `arrow::write_dataset()` ou `COPY ... TO ...` plutôt
+`arrow::write_parquet()`
+1. si ces outils repoussent (beaucoup) les limites, ils ne sont pas magiques :
+il peut encore être intéressant de scinder des calculs en plusieurs blocs pour
+les accélérer voire les rendre possibles.
+:::

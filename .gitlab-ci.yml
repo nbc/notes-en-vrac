@@ -1,0 +1,13 @@
+# The Docker image that will be used to build your app
+image: alpine
+# Functions that should be executed before the build script is run
+pages:
+  script:
+    - mkdir .public
+    - cp -r _site/* .public
+    - mv .public public
+  artifacts:
+    paths:
+      - public
+  only:
+    - main

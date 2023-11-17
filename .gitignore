@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+ma_base.db*
+
+data/
+
+/.quarto/
+*.db
+*.parquet

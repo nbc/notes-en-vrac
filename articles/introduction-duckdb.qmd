@@ -1,0 +1,1246 @@
+---
+title: "Traiter des données massives en R avec `duckdb`"
+lang: fr
+execute: 
+  cache: true
+editor: 
+  markdown: 
+    wrap: 72
+format:
+  html:
+    toc: true
+---
+
+```{r pagination}
+#| include: false
+#| cache: false
+
+library(knitr)
+hook_output <- knit_hooks$get("output")
+knit_hooks$set(output = function(x, options) {
+  lines <- options$output.lines
+  if (is.null(lines)) {
+    return(hook_output(x, options))  # pass to default hook
+  }
+  x <- unlist(strsplit(x, "\n"))
+  more <- "..."
+  if (length(lines)==1) {        # first n lines
+    if (length(x) > lines) {
+      # truncate the output, but add ....
+      x <- c(head(x, lines), more)
+    }
+  } else {
+    x <- c(more, x[lines], more)
+  }
+  # paste these lines together
+  x <- paste(c(x, ""), collapse = "\n")
+  hook_output(x, options)
+})
+```
+
+L'objectif de ce document est de montrer comment utiliser `duckdb`, il fait
+suite au [document d'introduction sur
+arrow](introduction-donnees-massives-arrow.qmd).
+
+Nous commençons par charger quelques packages utiles :
+
+```{r setup}
+#| message: false
+#| echo: true
+#| cache: false
+library(duckdb)
+library(arrow)
+library(tidyverse)
+library(tictoc)
+library(lubridate)
+library(glue)
+```
+
+## `duckdb` qu'est-ce que c'est ?
+
+`duckdb` est une base de données embarquée :
+
+* open source
+* orientée traitement analytique
+* très (très) rapide
+* requêtable avec `dplyr`/`dbplyr` ou directement en SQL
+* qui sait lire les fichiers parquet et interagir avec `arrow`
+* qui ne demande (quasiment) aucun paramétrage
+* qui tourne à l'intérieur de votre R et n'est accessible que par vous
+* qui propose une syntaxe SQL “enrichie” (PIVOT, SAMPLE, SELECT * EXCLUDE…)
+
+`duckdb` étant une base de données, les packages `DBI` (R DataBase Interface) et
+`dbplyr` (`dplyr` pour les Bases de données) seront utilisés et rapidement
+décrits, pour plus d'informations, vous pouvez vous reporter à la documentation
+[utilitr : se connecter à une base de
+données](https://www.book.utilitr.org/03_fiches_thematiques/fiche_connexion_bdd).
+
+
+En résumé :
+
+* `duckdb` est une base de données
+* `DBI` permet de se connecter sur une base de données et de lancer des requêtes
+* `dbplyr` permet d'utiliser les fonctions de `dplyr` et les transforme en requêtes SQL
+
+Les exemples de la suite sont en R mais `duckdb` sait aussi travailler avec
+[python](https://duckdb.org/docs/api/python/overview.html) et [plein d'autres
+langages](https://duckdb.org/docs/api/python/overview.html)
+
+::: callout-note
+## Quelques éléments sur l'accès aux bases de données en R
+
+`DBI` est le package qui permet d'interagir avec les bases de données. Les
+commandes principales sont :
+
+* `DBI::dbConnect()` : pour se connecter à une base de données
+* `DBI::dbGetQuery()` : exécute une requête et retourne le résultat (pour les requêtes de type SELECT)
+* `DBI::dbExecute()` : exécute une requête sans retourner le résultat (pour les requêtes de type CREATE)
+* `DBI::dbDdisconnect()` : pour se déconnecter d'une base de données
+
+Pour plus d'informations, allez voir [la page d'utilitr sur le
+sujet](https://www.book.utilitr.org/03_fiches_thematiques/fiche_connexion_bdd)
+ou la [documentation de DBI](https://dbi.r-dbi.org/)
+:::
+
+## Petit retour vers `arrow`
+
+Pour commencer nous allons ressortir le jeu de données des courses de taxi
+new-yorkais de 2009 à 2023 :
+
+```{r quelques_variables}
+#| cache: false
+taxi_dir <- "/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi"
+```
+
+```{r quelques_variables_maison}
+#| echo: false
+#| output: false
+#| cache: false
+if (Sys.info()["nodename"] == "barnabe") {
+  taxi_dir <- "/home/nc/travail/R/Rexploration/rdata/nyc-taxi/"
+}
+```
+
+
+```{r taxi_ds}
+open_dataset(taxi_dir)
+
+list.files(taxi_dir)
+
+open_dataset(taxi_dir) |> nrow()
+```
+
+Nous avons vu dans la session sur `arrow` que la fonction `to_duckdb()`
+permettait de passer des données de `arrow` à `duckdb` sans passer par un data
+frame/tibble intermédiaire.
+
+Reprenons rapidement cet exemple en cherchant la course avec la distance la plus
+longue sur janvier 2018 :
+
+```{r arrow}
+#| error: true
+open_dataset(taxi_dir) |>
+  filter(year == 2018 & month == 1) |>
+  filter(trip_distance == max(trip_distance, na.rm = TRUE)) |>
+  collect()
+```
+
+`arrow` ne supporte pas (encore ?) le filtre utilisé et nous propose de faire le
+`collect()`, donc de récupérer l'ensemble des données en mémoire, avant le
+filtre, ce qui serait une très mauvaise idée même sur un seul mois de courses...
+
+Essayons plutôt d'utiliser `to_duckdb()` :
+ 
+```{r arrow_to_duckdb}
+tic()
+open_dataset(taxi_dir) |>
+  filter(year == 2018 & month == 1) |>
+  to_duckdb() |>
+  filter(trip_distance == max(trip_distance, na.rm = TRUE)) |>
+  collect()
+toc()
+```
+
+`duckdb` sait gérer le filtre utilisé et `arrow::to_duckdb()` ne matérialise pas
+les données : il convertit un objet arrow au format duckdb et le passe à
+`duckdb` pour réaliser les calculs.
+
+Nous venons de trouver la ligne avec la distance de course la plus grande parmi
+des millions de lignes en quelques secondes.
+
+Pour être complet, même si dans le cas présent cela n'a aucun intérêt, on peut
+également réaliser l'opération inverse avec `arrow::to_arrow()` qui reconvertit
+un objet de `duckdb` vers `arrow` :
+
+```{r arrow_to_duckdb_2}
+open_dataset(taxi_dir) |>
+  filter(year == 2018 & month == 1) |>
+  to_duckdb() |>
+  filter(trip_distance == max(trip_distance, na.rm = TRUE)) |>
+  to_arrow() |>
+  collect()
+```
+
+À ce jour, `arrow` ne supporte pas les [fonctions de
+fenêtre](https://dplyr.tidyverse.org/articles/window-functions.html) mais passer
+par `duckdb` ne pose aucun problème.
+
+Passer de `arrow` à `duckdb` et vice versa fonctionne parfaitement et est très
+pratique par exemple quand une fonction n'existe pas dans `arrow` mais n'est pas
+optimal et peut poser des problèmes sur des gros volumes de données.
+
+## Utiliser `duckdb` nativement
+
+`duckdb` est une base de données, pour l'utiliser il faut :
+
+1. créer sa base de données
+1. de se connecter dessus.
+
+Ceux qui connaissent les "vraies" bases de données savent que ça n'est pas simple mais...
+
+Commençons par créer une base de données `duckdb` et ouvrir une connexion qui
+nous permettra de la manipuler :
+
+```{r duckdb_naive_1}
+#| cache: false
+con <- DBI::dbConnect(duckdb())
+```
+
+Et c'est fini. Nous avons créé une base de données vide anonyme (sans nom et en
+mémoire) et ouvert une connexion dessus, celle-ci étant disponible dans la
+variable `con`.
+
+:::callout-warning
+## gérer les limites des serveurs
+
+En pratique, il est **fortement conseillé** de fixer des limites à `duckdb` en
+utilisant une chaîne de connexion du type :
+
+```{r r_limitations}
+#| cache: false
+con <- dbConnect(
+  duckdb(), 
+  dbdir = "tuto_duckdb.db", 
+  config = list(
+    memory_limit = "10G",
+    threads = "4")
+  )
+```
+
+Cette chaîne de connexion va créer une base de données stockée dans un fichier
+`tuto_duckdb.db` avec des limites à 10Go de mémoire vive (à adapter à votre
+quota mémoire) et 4 cœurs. Si `duckdb` commence à atteindre son quota de mémoire
+vive, il passera par des fichiers temporaires.
+
+En utilisant cette connexion, vous vous assurez que vous ne saturerez pas les
+processeurs serveurs et que vos traitements ne planteront pas faute de mémoire.
+
+Sur les serveurs actuels, nous recommandons de ne pas dépasser 4 threads, cette
+directive évoluera avec l'arrivée des futurs serveurs qui disposeront de
+beaucoup plus de coeurs.
+:::
+
+On utilise ensuite la fonction `tbl()` qui va permettre de rendre accessible des
+données au format parquet (ou autre, nous le verrons plus tard) dans la base de
+données créée.
+
+:::callout-tip
+## Ne mettez pas vos chemins en dur dans votre code
+
+Plutôt que de répéter partout dans votre code le chemin vers vos fichiers, vous
+pouvez utiliser `glue::glue()` qui vient avec le tidyverse. Cette commande va
+remplacer les chaines entre parenthèse par le contenu de la variable :
+
+```{r glue}
+glue::glue("read_parquet('{taxi_dir}/**/*.parquet')")
+```
+:::
+
+```{r duckdb_naive_2}
+#| cache: false
+taxi <- tbl(con, glue("read_parquet('{taxi_dir}/**/*.parquet')"))
+```
+
+`dplyr::tbl()` va lancer l'ordre passé en deuxième argument, à savoir
+`read_parquet(...)` (rien à voir avec `arrow::read_parquet()`) dans la base de
+données précédemment créée et cette fonction va mettre à disposition les données
+des fichiers parquet comme si elles étaient vraiment stockées dans la base de
+données.
+
+Un point important : contrairement à `arrow::open_dataset()` qui prend en argument
+un répertoire, la fonction `read_parquet()` de `duckdb` prend des chemins de fichiers,
+dans le cas présent, le `**/*.parquet` veut dire : tous les fichiers avec une
+extension `.parquet` présents dans les sous-répertoires de `taxi_dir`. `duckdb`
+saura reconnaître les partitions s'il voit des répertoires nommées dans un motif
+`variable=valeur`.
+
+Nous pouvons visualiser la variable `taxi` :
+
+```{r duckdb_naive_3}
+taxi
+```
+
+dont le contenu ressemble à un dataframe classique mais les premières lignes
+nous indique qu'il s'agit bien de données stockées dans une base de données dont
+la source est un dataset parquet.
+
+Faisons quelques manipulations, nous voulons la distance des courses en km et
+ajouter une colonne avec le jour de la semaine de la course. `dbplyr` comprends
+beaucoup d'ordres du `tidyverse` et `lubridate::wday()` en fait partie :
+
+```{r duckdb_naive_4}
+#| cache: false
+tic()
+calcul <- taxi |> 
+  filter(year == 2016) |>
+  mutate(wday = wday(pickup_datetime),
+         trip_distance = trip_distance * 1.61)
+
+calcul |>
+  select(wday, trip_distance)
+toc()
+```
+
+Ce calcul devrait retourner plusieurs millions de lignes mais s'exécute en
+quelques ms. Que se passe-t-il ?
+
+:::callout-note
+## `dbplyr` et l'évaluation fainéante
+
+Contrairement à `dplyr` qui traite les ordres un par un, `dbplyr` va analyser
+l'ensemble de vos ordres, les transformer en SQL et l'envoyer à la base de
+données pour exécution mais de façon très particulière :
+
+* il récupère les données uniquement si vous lui demandez explicitement
+* il retarde l'exécution des requêtes le plus possible, quand vous demandez le résultat d'un calcul.
+* si vous "prévisualiser" un calcul, il va récupérer seulement quelques lignes
+
+Pour lui demander explicitement le résultat d'une requête, vous devez utiliser
+les fonctions :
+
+* `collect()` qui va récupérer les données en mémoire sous la forme d'un `tibble`
+* `compute()` qui va créer une table temporaire dans votre base, table que vous pourrez utiliser comme un tibble.
+:::
+
+## fichiers externes et jointures
+
+Dans la suite, nous voudrions étudier les courses de taxi partant des 3
+aéroports de New York, le problème est que l'information n'est pas présente dans
+les données actuelles. Heureusement, le jeu de données contient une colonne
+`pickup_location_id` et nous avons la correspondance dans le fichier
+`taxi+_zone_lookup.csv` se trouvant dans le répertoire parent de notre dataset
+sur les courses :
+
+```{r read_csv}
+#| warning: false
+readr::read_csv(file.path(taxi_dir, "../taxi+_zone_lookup.csv")) |>
+  filter(if_any(everything(), ~str_detect(., "(?i)airport")))
+```
+
+Et nous voyons bien les aéroports New Yorkais ! Visiblement les colonnes
+intéressantes sont LocationID et Zones. Nous allons les sélectionner et
+normaliser les noms :
+
+```{r read_csv_2}
+#| cache: false
+#| warning: false
+zones <- readr::read_csv(file.path(taxi_dir, "../taxi+_zone_lookup.csv")) |>
+  select(
+    pickup_location_id = LocationID,
+    pickup_zone = Zone
+  )
+zones
+```
+
+Nous devons maintenant mettre à disposition ces données dans la base `duckdb`,
+il y a plusieurs façons de le faire mais nous allons en voir deux qui sont
+sans doute les plus flexibles :
+
+* [`DBI::copy_to()`](https://dbplyr.tidyverse.org/reference/copy_to.src_sql.html) : qui copie les données d'un dataframe dans la base
+* `duckdb::duckdb_register()` qui enregistre les données d'un dataframe comme une table virtuelle sans les copier.
+
+Nous aurions aussi pu utiliser [les fonctions d'import CSV de
+duckdb](https://duckdb.org/docs/data/csv/overview.html) de `duckdb` qui sont
+très efficaces mais elles sont pour le moment limitées au CSV en UTF8 (ce qui
+est problématique pour beaucoup de vos données) et peuvent poser des problèmes
+sur des fichiers malformés. Si vous devez traiter des fichiers CSV volumineux
+(ou qui vous posent problème avec les outils classiques), vous devrez d'abord
+convertir vos fichiers en UTF8 (passez nous voir, nous pouvons vous aider).
+
+### `dplyr::copy_to()`
+
+```{r copy_to}
+#| cache: false
+copy_to(con, zones, "zones", overwrite = TRUE)
+```
+
+Cette commande va copier dans la base pointée par `con` le dataframe passées en
+deuxième argument `zones` dans une table ayant le nom du troisième argument (et
+pour éviter les problèmes à la génération de cette documentation j'autorise
+l'écrasement des données.)
+
+### `duckdb::duckdb_register()`
+
+```{r duckdb_register}
+duckdb::duckdb_register(con, "zones_duckdb", zones)
+```
+
+Cette commande va "enregistrer" les données du troisième argument dans la table
+nommée par le deuxième argument. Aucune écriture de données n'est réalisée.
+
+:::callout-tip
+Si vos données externes (CSV ou autres) sont volumineuses, vous avez intérêt à
+les convertir en parquet une fois pour toute pour bénéficier de toute la
+puissance de `duckdb` plutôt que de les copier ou les enregistrer à chaque fois.
+:::
+
+### La jointure
+
+Maintenant que nos zones sont mises à disposition dans `duckdb`, nous pouvons y
+accéder en utilisant `tbl()` qui peut, évidemment, mettre à disposition une
+table existante :
+
+```{r show_zones}
+tbl(con, "zones")
+```
+
+Et nous pouvons lancer notre requête pour trouver les distances
+moyennes des courses par jour de la semaine sur l'année 2016 en filtrant les
+lignes contenant la chaine `airport` dans la colonne `pickup_zone` :
+
+```{r jointure}
+#| warning: false
+tic()
+tbl(con, glue("{taxi_dir}/**/*.parquet")) |>
+  filter(year == 2016) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  left_join(tbl(con, "zones"))|>
+  # (?i) est pour indiquer que la recherche doit chercher toutes les casses
+  # majuscule et minuscule
+  filter(str_detect(pickup_zone, "(?i)airport")) |>
+  group_by(pickup_zone, wday) |>
+  summarize(mean_trip = mean(trip_distance)) |>
+  arrange(wday) |>
+  collect() |>
+  pivot_wider(names_from = wday, values_from = mean_trip)
+toc()
+```
+
+`dbplyr` reconnait énormément de fonctions du `tidyverse` que ça soit `stringr`,
+`lubridate` ou autre.
+
+"Et voila". Pas mal pour un traitement sur plus de 1,6 milliard de lignes et
+64Go de volume...
+
+:::callout-note
+`duckdb` analyse la requête dans sa globalité et l'optimise, une des
+optimisations est au niveau de la lecture en s'appuyant sur le format parquet
+qui est partitionné et organisé en colonnes.
+
+Donc `duckdb` va lire :
+
+1. uniquement les fichiers présent dans le répertoire `year=2016`
+1. juste les colonnes nécessaires, à savoir `pickup_datetime` pour calculer le
+jour de la semaine, `trip_distance` pour la moyenne et bien sûr
+`pickup_location_id` pour faire la jointure.
+
+D'autres optimisations sont réalisées grâce aux métadonnées stockées dans les
+fichiers parquet mais restons simple.
+:::
+
+## Petite comparaison avec `arrow`
+
+Comparons rapidement avec l'implémentation en `arrow`. Le premier jet ressemble
+beaucoup à ce que nous avons fait précédemment, sachant que `arrow` sait
+convertir à la volée des données d'un dataframe en objet `arrow` nous allons
+juste faire :
+
+```{r comparaison_arrow_1}
+#| error: true
+#| warning: false
+zones <- readr::read_csv(file.path(taxi_dir, "../taxi+_zone_lookup.csv")) |>
+  select(
+    pickup_location_id = LocationID,
+    pickup_zone = Zone
+  )
+
+open_dataset(taxi_dir) |>
+  filter(year == 2016) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  left_join(zones) |>
+  filter(str_detect(pickup_zone, "(?i)airport")) |>
+  group_by(pickup_zone, wday) |>
+  summarize(mean_trip = mean(trip_distance, na.rm = TRUE)) |>
+  arrange(wday) |>
+  collect() |>
+  pivot_wider(names_from = wday, values_from = mean_trip)
+```
+
+Ha oui, nous avons vu ce problème dans la session sur `arrow`, celui-ci est très
+à cheval sur les types des données utilisées dans les jointures, qu'à cela ne
+tienne, précisons le type de la colonne `pickup_location_id` et relançons la
+requête :
+
+```{r comparaison_arrow_2}
+#| warning: false
+zones_arrow <- readr::read_csv(file.path(taxi_dir, "../taxi+_zone_lookup.csv")) |>
+  select(
+    pickup_location_id = LocationID,
+    pickup_zone = Zone
+  ) |>
+  as_arrow_table(
+    schema = schema(
+      pickup_location_id = int64(),
+      pickup_zone = utf8()
+    )
+  )
+
+tic()
+open_dataset(taxi_dir) |>
+  filter(year == 2016) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  left_join(zones_arrow) |>
+  filter(str_detect(pickup_zone, "(?i)airport")) |>
+  group_by(pickup_zone, wday) |>
+  summarize(mean_trip = mean(trip_distance, na.rm = TRUE)) |>
+  arrange(wday) |>
+  collect() |>
+  pivot_wider(names_from = wday, values_from = mean_trip)
+toc()
+```
+
+Nous obtenons bien le même résultat mais, dans le cas présent, `arrow` est
+beaucoup plus lent que `duckdb` (et `arrow` est moins souple sur les types pour
+les jointures)
+
+:::callout-tip
+## `duckdb` est très fort en jointure
+Quand vous avez des jointures entre des tables "volumineuses", privilégiez
+`duckdb`
+:::
+
+## générer des fichiers intermédiaires avec `duckdb`
+
+Que ça soit dans la phase de nettoyage des sources ou dans la phase de calcul
+finale, il est parfois nécessaire de passer par des fichiers intermédiaires.
+
+Traditionnellement, on charge les données en mémoire, on les manipule (en
+mémoire) et on les écrit dans un nouveau fichier. Cette méthode atteint vite ses
+limites quand on travaille sur des fichiers de plusieurs dizaines voire
+centaines de gigaoctet tant par les temps de chargement que par la mémoire
+nécessaire.
+
+Nous allons prendre un fichier intermédiaire très simple :
+
+```{r intermediaire}
+#| cache: false
+result <- tbl(con, glue("{taxi_dir}/**/*.parquet")) |>
+  filter(year == 2016) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  left_join(tbl(con, "zones"))
+```
+
+Les données font un peu plus de 100 millions de lignes et les fichiers parquets
+autour de 2,5Go. Pour avoir un ordre de grandeur, le dataframe fait de l'ordre
+de 28Go en mémoire.
+
+### Pour les fichiers pérennes : parquet
+
+Si vos fichiers intermédiaires sont pérennes et volumineux, il est recommandé de
+les générer au format parquet.
+
+Il y a trois façons de faire ayant des résultats différents en couplant `tbl()`
+et les fonctions `arrow::write_parquet()` et `arrow::write_dataset()` :
+
+```{r intermediaire_parquet_1}
+#| eval: false
+result |>
+  collect() |>
+  write_parquet("fichier_intermediaire_1.parquet")
+```
+
+```{r intermediaire_parquet_2}
+#| eval: false
+result |>
+  to_arrow() |>
+  write_parquet("fichier_intermediaire_2.parquet")
+```
+
+```{r intermediaire_parquet_3}
+#| eval: false
+result |>
+  to_arrow() |>
+  write_dataset("fichier_intermediaire")
+```
+
+|num| méthode                                    | mémoire  |
+|--:|--------------------------------------------|---------:|
+|  1| `tbl() |> collect() |> write_parquet()`    | 50Go     |
+|  2| `tbl() |> to_arrow() |> write_parquet()`   | 25Go     |
+|  3| `tbl() |> to_arrow() |> write_dataset()`   | 15Go     |
+
+
+Toutes ces méthodes ont un inconvénient majeur, elle nécessite de passer de
+`duckdb` à `arrow` et doivent matérialiser plus ou moins de données (soit dans
+un dataframe, soit dans un objet arrow).
+
+1. matérialise l'ensemble des données en mémoire sous la forme d'un dataframe
+1. matérialise l'ensemble des données en mémoire sous la forme d'un objet arrow
+1. matérialise les données par morceaux sous forme d'objet arrow
+
+`duckdb` a une commande
+[`COPY`](https://duckdb.org/docs/sql/statements/copy.html) qui permet d'exporter
+des données de la base de la forme : `COPY {from} TO {to} ({config})`.
+
+Pour copier vers un fichier parquet nous pouvons putiliser le sql généré par la
+requête et pour ça il existe une fonction pratique `DBI::SQL()` qui permet de le
+réutiliser. Nous allons donc stocker la requête :
+
+```{r intermediaire_parquet_5}
+request <- result |>
+  dbplyr::sql_render(con = con)
+request
+```
+
+Et l'utiliser dans `COPY ... TO ...` :
+
+```{r intermediaire_parquet_6}
+#| eval: false
+request <- result |>
+  sql_render(con = con)
+
+dbExecute(conn, glue::glue("COPY ({DBI::SQL(request)}) TO 'monfichier.parquet' (FORMAT PARQUET)"))
+```
+
+Cette méthode prend autour de 2Go de mémoire.
+
+Pour être complet, il est possible d'utiliser uniquement `arrow` :
+
+```{r intermediaire_parquet_7}
+#| eval: false
+open_dataset(taxi_dir) |>
+  filter(year == 2016) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  write_dataset("fichier_intermediaire")
+```
+
+Cette méthode consomme 7Go de mémoire.
+
+Le classement final :
+
+| méthode                                    | mémoire  | temps    |
+|--------------------------------------------|---------:|---------:|
+| `tbl() |> collect() |> write_parquet()`    | 50Go     | 240s     |
+| `tbl() |> to_arrow() |> write_parquet()`   | 25Go     | 300s     |
+| `tbl() |> to_arrow() |> write_dataset()`   | 15Go     | 305s     |
+| `open_dataset() |> write_dataset()`        | 7Go      | 325s     |
+| `COPY ... TO...`                           | 2Go      | 145s     |
+
+Un exemple sur la conversion d'un cas réel est disponible
+[ici](cas-pratique-traitement-duckdb.qmd)
+
+::: callout-note
+Si vous devez utiliser des fichiers intermédiaires pour des données pérennes,
+utilisez le format parquet.
+
+Si vos fichiers sources sont vraiment volumineux, `duckdb` sera plus efficace
+que `arrow`
+:::
+
+### Pour les données à courte durée de vie
+
+Plusieurs solutions sont possibles. Vous pouvez bien sûr utiliser parquet comme
+précédemment mais vous pouvez aussi créer une table dans `duckdb`. `copy_to`
+sait copier des données issues d'une requête `dbplyr` vers la base de données
+sans récupérer les données dans R :
+
+```{r courte_vie}
+request <- tbl(con, glue("{taxi_dir}/**/*.parquet")) |>
+  filter(year == 2016) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  head()
+
+table_request <- copy_to(con, request, "table_request")
+```
+
+Attention, cette requête copie réellement les données en base, elle peut donc
+prendre un certain temps.
+
+Vous pouvez maintenant utiliser la variable `table_request` qui contient en
+pratique l'équivalent de l'ordre `tbl(con, "table_request")`.
+
+```{r courte_vie_2}
+table_request
+```
+
+:::callout-warning
+## le format de données de duckdb n'est pas encore stable
+
+Si vous stockez des données en base, à la prochaine mise à jour de `duckdb`, il
+vous préviendra au lancement qu'il n'arrive pas à lire le fichier.
+
+Si ça vous arrive, vous devrez réinstaller l'ancienne version de duckdb,
+exporter vos données et les réimporter avec la nouvelle version.
+
+Pour stocker des données au delà de quelques heures/jours, privilégiez le format
+parquet.
+:::
+
+## Les limitations de `dbplyr`
+
+Comme tous les outils, `dbplyr` a des limitations :
+
+* tous les ordres `dplyr` ne sont pas compris (rowwise, ...)
+* une compréhension de SQL peut vous aider à corriger des erreurs
+* globalement incompatible avec les fonctions de R base.
+
+Et comme pour `arrow`, certains comportements différents de `dplyr` peuvent être
+perturbants :
+
+* certaines astuces R ne passent pas (sommer des booleens...)
+* `stringr` accepte une regexp comme `[:punct:]` (qui n’est normalement pas valide), pour `duckdb` il faudra utiliser `[[:punct:]]`
+
+Il y en a certainement d'autres.
+
+## Faut-il passer à SQL ?
+
+Ça n'est pas une obligation... mais ça peut être pratique.
+
+`duckdb` est une base de données, ça veut dire que son langage natif est le SQL
+et malgré l'expressivité des packages `tidyverse`, ils ne pourront jamais
+l'égaler. Par ailleurs, `duckdb` est orienté traitement statistique, il intègre
+donc beaucoup de fonctions qui peuvent vous être très utiles.
+
+Mais commençons tout doucement.
+
+### Des (petits) bouts de SQL
+
+Quand `dbplyr` ne comprend pas une fonction, il la passe directement à la base
+de données.
+
+Imaginons que nous voulions trouver la plus grande valeur entre les lignes
+`fare_amount` et `tip_amount`. Avec `dplyr`, nous pourrions utiliser `rowwise`
+mais cette fonction n'est pas connue de `duckdb` ni de `arrow`. Nous pouvons
+utiliser la fonction `GREATEST` de `duckdb` :
+
+```{r passer_sql_1}
+taxi |>
+  filter(year == 2018, month == 1) |>
+  mutate(greatest = GREATEST(fare_amount, tip_amount)) |>
+  select(fare_amount, tip_amount, greatest) |>
+  head(3)
+```
+
+`duckdb` est orienté traitement statistique, si vous avez besoin d'une fonction
+non implémentée en `dplyr`, elle existe peut-être dans `duckdb` et en
+particulier dans les [fonctions
+d'agrégat](https://duckdb.org/docs/sql/aggregates.html)
+
+**Ce point est vraiment très pratique** en particulier si vous n'avez pas envie de
+chercher quelles fonctions de `stringr` ou `lubridate` sont traduites. Il suffit
+d'aller voir les pages de documentation de `duckdb` et en particulier (mais les
+autres sont intéressantes aussi !) :
+
+* [les fonctions de chaines de caractères](https://duckdb.org/docs/sql/functions/char.html)
+* [les fonctions de calcul sur les dates](https://duckdb.org/docs/sql/functions/date)
+* [les fonctions d'extraction d'élements de dates](https://duckdb.org/docs/sql/functions/datepart)
+* [les fonctions de "pattern matching"](https://duckdb.org/docs/sql/functions/patternmatching)
+* ...
+
+Pour trouver votre bonheur.
+
+```{r exemples_duckdb_fonction_1}
+#| echo: false
+#| output: false
+#| cache: false
+tb = tibble(
+  adresse = c('1, RUE DE BERCY, 92500 Paris', '3 rue de bagnolet. 93000 Montreuil'),
+  nom_de_fichier = c('fichier_1993.csv', 'nom_de_fichier_2003.csv'),
+  date = ymd(c("2023-09-10"), "2019-03-05")
+) |> write_parquet("test.parquet")
+
+duckdb_register(con, "mon_tb", tb, overwrite = TRUE)
+```
+
+Un exemple, nous avons une table avec 3 colonnes 
+
+```{r exemples_duckdb_fonction_2}
+tbl(con, "mon_tb")
+```
+
+et nous voulons :
+
+1. normaliser la colonne adresse en passant en minuscule et en ne gardant que
+les chiffres et les lettres
+2. récupérer l'année du nom du fichier sous forme d'entier
+3. avoir la date du 1er janvier de l'année récupérée ci-dessus
+4. trouver le 1er du mois de la colonne date
+
+Voici la commande finale en utilisant des ordres `duckdb`:
+
+```{r exemples_duckdb_fonction_3}
+tbl(con, "mon_tb") |>
+  mutate(
+    # [^a-z0-9 ] indique tous les caractères SAUF ceux cités (et ceux entre les deux bornes)
+    # le 'g' final indique que le replacement doit être global
+    adresse = REGEXP_REPLACE(LOWER(adresse), '[^a-z0-9 ]+', '', 'g'),
+    # on peut mixer les fonctions dplyr avec les fonctions de duckdb
+    annee_extraite = as.integer(REGEXP_EXTRACT(nom_de_fichier, '([0-9]+)')),
+    premier_janvier_annee_extraite = MAKE_DATE(annee_extraite, 1L, 1L),
+    premier_du_mois = DATE_TRUNC('month', date)
+  ) |>
+  select(adresse, premier_janvier_annee_extraite, premier_du_mois)
+```
+
+Il est quand même sain d'avertir le lecteur que certaines fonctions viennent de
+`duckdb` afin qu'il ne cherche pas des heures dans la documentation de `stringr`
+et `lubridate`, l'utilisation des majuscules me parait une piste intéressante.
+
+### Du SQL spécifique
+
+`duckdb` implémente la norme SQL et un peu plus. Voici quelques ordres qui
+peuvent être intéressants :
+
+* [SUMMARIZE](https://duckdb.org/docs/guides/meta/summarize.html) : calcul un certain nombre d'aggrégat (min, max, moyenne, ...) sur une table
+* [PIVOT](https://duckdb.org/docs/sql/statements/pivot.html) et [UNPIVOT](https://duckdb.org/docs/sql/statements/unpivot.html) : similaire à `tidyr::pivot_longer` et `tidyr::pivot_wider`
+* GROUP BY ALL : permet de ne pas répéter les colonnes du SELECT
+* [SELECT EXCLUDE](https://duckdb.org/docs/sql/query_syntax/select.html) : permet d'exclure des colonnes d'un SELECT
+* [GROUP BY CUBE / GROUP BY GROUPING SETS](https://duckdb.org/docs/sql/query_syntax/grouping_sets.html) permet de réaliser plusieurs GROUP BY dans la même requête
+
+Pour en savoir plus, la documentation de
+[`duckdb`](https://duckdb.org/docs/sql/introduction.html).
+
+### Passer de SQL à `dbplyr`
+
+Quand vous manipulez plusieurs jeux de données importants, il peut être plus
+pratique/lisible de passer par une vue consolidée avec les jointures déjà faites
+plutôt que de refaire les left_join/right_join/... à chaque fois et de passer
+ensuite à `dplyr`.
+
+En l'occurrence, nous allons créer une vue consolidée (en SQL, une vue est une
+table virtuelle qui est calculée en temps réel, aucune donnée n'est stockée),
+intégrant le nom de la zone de pickup et nous laisserons tout la partie calcul
+en `tidyverse` :
+
+```{r view}
+dbExecute(con, glue("CREATE OR REPLACE VIEW courses AS 
+SELECT * FROM
+  read_parquet('{taxi_dir}/**/*.parquet') AS taxi,
+  zones
+WHERE taxi.pickup_location_id = zones.pickup_location_id"))
+```
+
+:::callout-note
+Si vous ne savez pas du tout faire de SQL, vous pouvez utiliser la commande
+`dbplyr::sql_render()` pour voir ce que fait `dbplyr` et vous en inspirer :
+
+```{r sql_render}
+tbl(con, glue("{taxi_dir}/**/*.parquet")) |>
+  left_join(tbl(con, "zones")) |>
+  dbplyr::sql_render()
+```
+:::
+
+Vous pouvez maintenant utilisez la vue `courses` qui intègre les données des
+zones y compris les noms :
+
+```{r tbl_courses}
+tbl(con, "courses")
+```
+
+```{r view_request}
+tbl(con, "courses") |>
+  filter(year == 2016) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  filter(str_detect(pickup_zone, "irport")) |>
+  group_by(pickup_zone, wday) |>
+  summarize(mean_trip = mean(trip_distance, na.rm = TRUE)) |>
+  arrange(wday) |>
+  collect() |>
+  pivot_wider(names_from = wday, values_from = mean_trip)
+```
+
+### Passer de `dbplyr` à SQL
+
+La première question est "pourquoi voudrais-je faire ça ?". Pour utiliser une
+fonction de `duckdb` par exemple `SUMMARIZE` ?
+
+Passer de `dbplyr` à SQL est (un peu) plus compliqué que de passer de SQL à
+`dbplyr` que nous avons vu juste avant. Il faut obligatoirement utiliser un
+"stockage" temporaire.
+
+#### Passer par une table
+
+Une première solution est d'utiliser une propriété de `dplyr::copy_to()` qui,
+quand on lui passe des ordres `dplyr`, va les copier dans une table de la base de
+données passée en paramètre :
+
+```{r dplyr_to_sql}
+#| cache: false
+courses_janvier_2016 <- tbl(con, glue("read_parquet('{taxi_dir}/**/*.parquet')")) |> 
+  filter(year == 2016, month == 1) |>
+  mutate(wday = wday(pickup_datetime)) |>
+  head()
+
+# j'utilise `overwrite = TRUE` dans le cadre de la génération de ce document,
+# vous n'en avez pas forcément besoin
+nouvelle_table <- copy_to(con, courses_janvier_2016, "courses_janvier_2016", overwrite = TRUE)
+
+nouvelle_table
+```
+
+Vous pouvez maintenant utiliser des functions `dplyr` sur la variable `nouvelle_table` :
+
+**Attention**, cette méthode copie réellement les données dans une table temporaire
+et va donc prendre du temps et de la place.
+
+#### Passer par une vue
+
+Une deuxième solution est de créer une vue SQL qui ne copiera aucune donnée,
+pour cela nous allons capturer le SQL générer par `dbplyr` :
+
+```{r dplyr_to_sql_2}
+#| cache: false
+sql <- courses_janvier_2016 |> 
+  dbplyr::sql_render(con = con) |>
+  DBI::SQL()
+sql
+```
+
+et l'utiliser pour créer une vue avec `duckdb` : 
+
+```{r dplyr_to_sql_3}
+#| cache: false
+dbExecute(con, glue("CREATE OR REPLACE VIEW courses_janvier_2016 AS ({sql})"))
+```
+
+Vous pouvez maintenant utiliser la vue `courses_janvier_2016` :
+
+```{r dplyr_to_sql_4}
+tbl(con, "courses_janvier_2016")
+```
+
+#### Avantage/inconvénient
+
+La première méthode devra générer les données, ce qui prendra du temps et de
+l'espace disque, mais les calculs ultérieurs seront plus rapides, la deuxième ne
+génère aucune copie mais les calculs ultérieurs seront plus lents. La meilleure
+solution dépendra de votre cas.
+
+### SQL est compliqué !
+
+Dans cette partie, nous allons voir exemple de conversion d'un calcul réel de
+`data.table` à SQL en passant par `dplyr`. Cette exemple est tiré du même cas
+réel que celui traité [ici](cas-pratique-traitement-duckdb.qmd).
+
+La version initiale sépare le traitement en dix sous-traitements et les réunis à
+la fin :
+
+```{r trivar_1}
+#| eval: false
+calcul_total_trivar <- function(var1,var2,var3){
+  full_data <- lapply(0:9, function(i){
+    data_etude <- read_parquet(paste0(chemin_export_tables,"data_etude_",i,".parquet"),col_select=c("year",var1,var2,var3)) %>%
+      filter(year %in% c(2012,2019,2021,2022))
+    stat_annee <- data_etude[  , .(total = sum(eval(parse(text=(var1))), na.rm=TRUE)), by=c("year",var2,var3)]
+    rm("data_etude")
+    return(stat_annee)
+  })
+
+  full_data <- rbindlist(full_data)
+  formula <- as.formula(paste0(paste(var2,var3,sep="+"),"~year"))
+  total_var1_var2_var3 <- dcast(data=full_data,formula,fun.aggregate=sum)
+  return(total_var1_var2_var3)
+}
+
+tic()
+res <- calcul_total_trivar("parc_01_01", "co2_reel_tr", "crit_air")
+toc()
+```
+
+(et après on dit que SQL est compliqué...)
+
+La version `dbplyr` est nettement plus lisible :
+
+```{r trivar_2}
+#| eval: false
+dbplyr_calcul_total_trivar <- function(var1, var2, var3) {
+  tbl(con, "output/etude/**/*.parquet") %>%
+    filter(year %in% c(2012,2019,2021,2022)) %>%
+    group_by(year, {{var2}}, {{var3}}) %>%
+    summarize(total = sum({{var1}}, na.rm = TRUE)) %>%
+    collect() %>%
+    pivot_wider(names_from = year, values_from = total) %>%
+    arrange({{var2}}, {{var3}})
+}
+tic()
+res <- dbplyr_calcul_total_trivar(parc_01_01, co2_reel_tr, crit_air)
+toc()
+```
+
+Mais `duckdb` a une fonction `pivot` qui fait tout le travail pour nous et voici
+la version finale :
+
+```{r trivar_3}
+#| eval: false
+dbuckdb_calcul_total_trivar <- function(var1, var2, var3) {
+  DBI::dbGetQuery(con, glue::glue("
+  PIVOT read_parquet('output/etude/**/*.parquet')
+  ON year IN (2012, 2019, 2021, 2022)
+  USING SUM({var1})
+  GROUP BY {var2}, {var3}
+  ORDER BY {var2}, {var3}"))
+}
+tic()
+res <- duckdb_calcul_total_trivar("parc_01_01", "co2_reel_tr", "crit_air")
+toc()
+```
+
+La version initiale met 140s et utilise 4,5Go de mémoire, les deux versions
+`dplyr` et `duckdb` utilise 400Mo et mettent 10s. Est-ce qu'il y a vraiment un avantage à
+passer à SQL ? A vous de voir.
+
+:::callout-note
+## Petit point sur le fonctionnement de `duckdb`
+
+`duckdb` est une base de données à part entière, à savoir que le traitement
+d'une requête intègre une phase de planification et d'optimisation. `duckdb` va
+analyser les différentes façons possible d'exécuter la requête et choisir celle
+qui lui semble la plus pertinente.
+
+Vous pouvez voir le plan d'exécution en utilisant la commande `EXPLAIN` :
+
+```{sql, eval = FALSE}
+EXPLAIN SELECT * FROM tbl;
+```
+
+Il est par ailleurs multi-processeurs. Suivant les tâches qu'il a à effectuer,
+il pourra les scinder et les faire exécuter en parallèle par différent
+processeurs (d'où le paramètre `threads` que nous passons en paramètre).
+:::
+
+## Quelques trucs en vracs 
+
+### Utilisez toujours la dernière version de R et des packages `arrow` et `duckdb`
+
+`arrow` et `duckdb` sont encore jeunes et évoluent très rapidement, il est
+fortement conseillé d'utiliser les dernières versions et sur les serveurs du
+SDES d'utiliser la dernière version de R.
+
+### Partitionner vos données
+
+Ce point n'est pas vraiment un "truc" mais plutôt une "base" : si une variable
+est souvent utilisée dans un filtre, une partition peut vous permettre de
+réduire vos temps d'au moins un ordre de grandeur voire plus.
+
+Et évidemment, la commande `COPY ... TO ...` de `duckdb` permet de
+partitionner :
+
+```{r partition}
+#| eval: false
+dbExecute(con, glue::glue("COPY (SELECT * FROM courses_taxi) 
+                          TO 'dataset_par_annee' (FORMAT PARQUET, PARTITION_BY (year, month))"))
+```
+
+### Simplifier l'utilisation des fichiers parquet
+
+Il peut être assez lassant de devoir utiliser à chaque fois le nom complet du
+fichier ou du dataset parquet. Pour éviter ça, vous pouvez passer par une vue :
+
+```{r parquet_vue}
+#| output: false
+#| cache: false
+dbExecute(con, glue::glue("CREATE OR REPLACE VIEW courses_taxi AS
+                          SELECT * FROM read_parquet('{taxi_dir}/**/*.parquet')"))
+```
+
+Dans la suite de votre code vous pourrez utiliser directement `courses_taxi`
+soit dans un appel à `tbl()` soit dans une requête :
+
+```{r parquet_vue_2}
+#| output: false
+dbGetQuery(con, "SELECT * FROM courses_taxi LIMIT 1")
+
+tbl(con, "courses_taxi") |>
+  filter(year == 2016) |>
+  head()
+```
+
+### Vous aurez peut-être (encore) à séparer vos traitements en plusieurs blocs
+
+`duckdb` sait gérer les limites mémoires par débordement : quand il n'a plus
+assez de mémoire il écrit sur disque. Evidemment, ce mécanisme de débordement
+implique des temps de traitement nettement plus long (au moins un ordre de
+grandeur).
+
+Dans ces cas là, il peut être vraiment intéressant de revenir à un traitement
+par bloc. Vous pouvez bien sûr le faire en filtrant (`dlyr::filter( ...)`) sur
+vos fichiers parquet et idéalement en filtrant sur une partition parquet pour
+être efficace.
+
+### redémarrer votre session de temps en temps
+
+`duckdb` a tendance à consommer de la mémoire qui n'est jamais libérée.
+Redémarrer votre session de temps en temps :
+
+Menu Session => Restart R
+
+### Pourquoi faut-il éviter d'utiliser `arrow::open_dataset(...) >| to_duckdb(con) |> ...`
+
+Cette méthode est tout à fait valide, d'autant qu'on peut passer une connexion
+(avec ses limites) à `to_duckdb()`
+
+Néanmoins, même si `arrow::open_dataset(...) >| to_duckdb()` passe uniquement un
+objet, une partie du traitement sera réalisée par `arrow` et une partie par
+`duckdb`, les deux consommeront de la mémoire et la limite mémoire que vous
+aurez fixée ne s'appliqueront qu'à `duckdb()`.
+
+(De la même façon, n'utilisez jamais `duckdb::duckdb_register()` sur un objet
+`arrow`, ça marchera mais ne sera pas optimisé.)
+
+Avec `tbl()`, la limite mémoire sera entièrement gérée par `duckdb` et donc
+respectée.
+
+Sur des datasets de petite taille vous ne verrez pas d'impact mais sur sur des
+tailles conséquentes c'est toute la différence entre un traitement qui aboutit
+et un traitement qui s'arrête au milieu faute de mémoire.
+
+### Plantage par manque de mémoire
+
+Dans certains cas très particuliers, j'ai constaté que mes traitements sur des
+fichiers volumineux pouvaient planter pour un problème de mémoire sur un simple
+`COPY ... TO ...` . Ceci peut être dû à un fichier bizarrement créé. Je ne
+détaillerais pas d'où vient le problème mais vous pouvez vérifier en passant la
+commande suivante :
+
+```{r plantage}
+#| output: false
+#| echo: false
+#| cache: false
+fichier_problematique <- "/nfs/bsrv-stat/RSVERO2/Fichiers_etudes/Data/Parc/Parc_2022/Donnees_individuelles/data_vehicule_VP_0.parquet"
+con <- DBI::dbConnect(duckdb())
+```
+
+```{r plantage_1}
+dbGetQuery(con, glue("SELECT row_group_num_rows, (row_group_bytes / 1024 ^ 2) AS row_group_megaoctet
+                     FROM parquet_metadata('{fichier_problematique}') LIMIT 1"))
+```
+
+Si la colonne `row_group_num_rows` est bien supérieure à 1 000 000  et la
+colonne `row_group_megaoctet` est proche voire supérieure au Go comme ici , le
+problème peut venir de là. Une solution est de réduire le nombre de threads de
+duckdb  à "1" le temps de passer le traitement :
+
+```{r r_plantage_2}
+#| eval: false
+con <- dbConnect(
+  duckdb(), 
+  dbdir = "tuto_duckdb.db", 
+  config = list(
+    memory_limit = "10G",
+    threads = "1")
+  )
+```
+
+Si vous utilisez régulièrement ce fichier, il peut être intéressant de le
+corriger définitivement, un `COPY ... TO ...` ou `open_dataset() |>
+write_dataset()` suffisent, `arrow` fixe par défaut la valeur à 32768 et
+`duckdb` à 122880.
+
+Pour plus d'information sur la [notion de "row
+group"](https://cloudsqale.com/2020/05/29/how-parquet-files-are-written-row-groups-pages-required-memory-and-flush-operations/).
+
+
+### Fermer votre base de données
+
+Pensez à fermer votre base de données avec la commande :
+
+```{r fermer_duckdb}
+#| cache: false
+dbDisconnect(con, shutdown = TRUE)
+```
+
+ça vous évitera des messages d'avertissement comme :
+
+```
+Warning messages:
+1: Database is garbage-collected, use dbDisconnect(con, shutdown=TRUE) or duckdb::duckdb_shutdown(drv) to avoid this. 
+2: Connection is garbage-collected, use dbDisconnect() to avoid this. 
+```
+
+## Quelques derniers compléments sur `duckdb`
+
+Au delà du CSV et de parquet, `duckdb` sait lire le format json, sait gérer les
+données imbriquées et les structures complexes.
+
+Des extensions sont
+[disponibles](https://duckdb.org/docs/extensions/overview.html) pour traiter des
+données SIG, interroger une base de données postgres/mysql/sqlite ou encore
+interroger des fichiers parquet à travers internet.
+
+Et `duckdb` est encore jeune, chaque version apporte son lot d'évolution. La
+0.9.0 a nettement amélioré la gestion de la mémoire.
+
+## Conclusion
+
+Que ça soit avec `dplyr` ou nativement, comme `arrow`, `duckdb` rend rapide des calculs qui
+étaient lents et possible des calculs qui ne l'étaient pas.
+
+Contrairement à `arrow`, il est capable de faire des jointures entre des tables
+de plusieurs dizaines voire centaines de millions de lignes et de donner les
+résultats en quelques secondes ou minutes.
+
+Le format de données interne est très performant (encore plus rapide que
+parquet) mais n'est pas encore stabilisé, il est donc déconseillé de l'utiliser
+pour des données pérennes.
+
+### `duckdb` pour quoi faire ?
+
+`duckdb` peut intervenir à plusieurs phases de vos travaux :
+
+* pour nettoyer vos données
+* pour regarder ce qu'il y a dedans
+* pour faire vos études
+* pour faire des chaines de production
+
+Si vous avez du CSV mal formé ou dans un encodage différent de UTF8, vous
+devrez peut-être passer par d'autres outils pour le rendre lisible.
+
+`duckdb` n'est pas adapté :
+
+* si vous ne souhaitez pas traiter de la donnée (au sens stat du terme)
+* si vous voulez faire des transactions
+* si vos données sont mises à jour en temps réel
+
+### Comment choisir entre `arrow` et `duckdb`
+
+Si vous avez à choisir entre `arrow` et `duckdb` :
+
+1. si vous manipulez un fichier unique : `arrow` et/ou `duckdb`
+1. `arrow` n'implémente pas les fonctions dont vous avez besoin : `to_duckdb()`
+1. vous avez des jointures conséquentes : `duckdb` (associé à `dbplyr` ou pas)
+1. vous aimez SQL : `duckdb`
+
+Si je devais donner mon avis personnel (que personne ne demande), je trouve
+`duckdb` plus puissant, plus complet et plus souple que `arrow` et j'en arrive
+(presque) à apprécier SQL. Le fait de pouvoir utiliser toutes les fonctions de
+`duckdb` à travers `dplyr` donne accès à une boite à outil très intéressante.
+
+### Convertir un traitement vers `duckdb` et `dbplyr` (ou pas)
+
+Je reprends les mêmes conseils que dans la session `arrow`, quand vous
+convertissez un traitement de {dplyr}, faites des tests :
+
+* sur quelques lignes et comparer les deux sorties.
+* sur les agrégats entre les deux méthodes (la fonction [SUMMARIZE](https://duckdb.org/docs/guides/meta/summarize.html) peut vous aider)
+* sur le fonctionnement de vos expressions rationnelles
+* sur la conversion des dates par `lubridate` (calcul de max sur les dates, que donne un NA...)
+* ...
+
+## Quelques références 
+
+* la [documentation de l'API R de duckdb](https://duckdb.org/docs/api/r.html)
+* la [documentation de `dbplyr`](https://dbplyr.tidyverse.org/)
+* la [documentation du SQL de duckdb](https://duckdb.org/docs/sql/introduction)
+* [Manipuler des données volumineuses avec Arrow & DuckDB](https://www.christophenicault.com/fr/post/large_dataframe_arrow_duckdb/)
+* les pages sur [parquet](https://www.book.utilitr.org/03_fiches_thematiques/fiche_import_fichiers_parquet) et sur [l'accès aux bases de données](https://www.book.utilitr.org/03_fiches_thematiques/fiche_connexion_bdd) d'utilitR
