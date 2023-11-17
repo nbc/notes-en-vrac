@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.335">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>big data &amp; R - Traiter des données massives en R avec duckdb</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "Pas de résultats",
+    "search-matching-documents-text": "documents trouvés",
+    "search-copy-link-title": "Copier le lien vers la recherche",
+    "search-hide-matches-text": "Cacher les correspondances additionnelles",
+    "search-more-match-text": "correspondance de plus dans ce document",
+    "search-more-matches-text": "correspondances de plus dans ce document",
+    "search-clear-button-title": "Effacer",
+    "search-detached-cancel-button-title": "Annuler",
+    "search-submit-button-title": "Envoyer"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar docked">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+    <div class="container-fluid d-flex justify-content-between">
+      <h1 class="quarto-secondary-nav-title">Traiter des données massives en R avec <code>duckdb</code></h1>
+      <button type="button" class="quarto-btn-toggle btn" aria-label="Show secondary navigation">
+        <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">big data &amp; R</a> 
+    </div>
+      </div>
+      <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+      </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">Les outils big data de R</a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="true">Quelques documents en vracs</a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="true">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./introduction-donnees-massives-arrow.html" class="sidebar-item-text sidebar-link">Introduction à arrow</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./introduction-duckdb.html" class="sidebar-item-text sidebar-link active">Introduction à duckdb</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./cas-pratique-traitement-duckdb.html" class="sidebar-item-text sidebar-link">Un exemple de conversion a duckdb</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./conversion-fichier-sas.html" class="sidebar-item-text sidebar-link">Notes sur la conversion de fichiers SAS</a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true">Présentations</a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./presentation_insee.html" class="sidebar-item-text sidebar-link">REX SDES - Présentation INSEE</a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Sur cette page</h2>
+   
+  <ul>
+  <li><a href="#duckdb-quest-ce-que-cest" id="toc-duckdb-quest-ce-que-cest" class="nav-link active" data-scroll-target="#duckdb-quest-ce-que-cest"><code>duckdb</code> qu’est-ce que c’est ?</a></li>
+  <li><a href="#petit-retour-vers-arrow" id="toc-petit-retour-vers-arrow" class="nav-link" data-scroll-target="#petit-retour-vers-arrow">Petit retour vers <code>arrow</code></a></li>
+  <li><a href="#utiliser-duckdb-nativement" id="toc-utiliser-duckdb-nativement" class="nav-link" data-scroll-target="#utiliser-duckdb-nativement">Utiliser <code>duckdb</code> nativement</a></li>
+  <li><a href="#fichiers-externes-et-jointures" id="toc-fichiers-externes-et-jointures" class="nav-link" data-scroll-target="#fichiers-externes-et-jointures">fichiers externes et jointures</a>
+  <ul class="collapse">
+  <li><a href="#dplyrcopy_to" id="toc-dplyrcopy_to" class="nav-link" data-scroll-target="#dplyrcopy_to"><code>dplyr::copy_to()</code></a></li>
+  <li><a href="#duckdbduckdb_register" id="toc-duckdbduckdb_register" class="nav-link" data-scroll-target="#duckdbduckdb_register"><code>duckdb::duckdb_register()</code></a></li>
+  <li><a href="#la-jointure" id="toc-la-jointure" class="nav-link" data-scroll-target="#la-jointure">La jointure</a></li>
+  </ul></li>
+  <li><a href="#petite-comparaison-avec-arrow" id="toc-petite-comparaison-avec-arrow" class="nav-link" data-scroll-target="#petite-comparaison-avec-arrow">Petite comparaison avec <code>arrow</code></a></li>
+  <li><a href="#générer-des-fichiers-intermédiaires-avec-duckdb" id="toc-générer-des-fichiers-intermédiaires-avec-duckdb" class="nav-link" data-scroll-target="#générer-des-fichiers-intermédiaires-avec-duckdb">générer des fichiers intermédiaires avec <code>duckdb</code></a>
+  <ul class="collapse">
+  <li><a href="#pour-les-fichiers-pérennes-parquet" id="toc-pour-les-fichiers-pérennes-parquet" class="nav-link" data-scroll-target="#pour-les-fichiers-pérennes-parquet">Pour les fichiers pérennes : parquet</a></li>
+  <li><a href="#pour-les-données-à-courte-durée-de-vie" id="toc-pour-les-données-à-courte-durée-de-vie" class="nav-link" data-scroll-target="#pour-les-données-à-courte-durée-de-vie">Pour les données à courte durée de vie</a></li>
+  </ul></li>
+  <li><a href="#les-limitations-de-dbplyr" id="toc-les-limitations-de-dbplyr" class="nav-link" data-scroll-target="#les-limitations-de-dbplyr">Les limitations de <code>dbplyr</code></a></li>
+  <li><a href="#faut-il-passer-à-sql" id="toc-faut-il-passer-à-sql" class="nav-link" data-scroll-target="#faut-il-passer-à-sql">Faut-il passer à SQL ?</a>
+  <ul class="collapse">
+  <li><a href="#des-petits-bouts-de-sql" id="toc-des-petits-bouts-de-sql" class="nav-link" data-scroll-target="#des-petits-bouts-de-sql">Des (petits) bouts de SQL</a></li>
+  <li><a href="#du-sql-spécifique" id="toc-du-sql-spécifique" class="nav-link" data-scroll-target="#du-sql-spécifique">Du SQL spécifique</a></li>
+  <li><a href="#passer-de-sql-à-dbplyr" id="toc-passer-de-sql-à-dbplyr" class="nav-link" data-scroll-target="#passer-de-sql-à-dbplyr">Passer de SQL à <code>dbplyr</code></a></li>
+  <li><a href="#passer-de-dbplyr-à-sql" id="toc-passer-de-dbplyr-à-sql" class="nav-link" data-scroll-target="#passer-de-dbplyr-à-sql">Passer de <code>dbplyr</code> à SQL</a></li>
+  <li><a href="#sql-est-compliqué" id="toc-sql-est-compliqué" class="nav-link" data-scroll-target="#sql-est-compliqué">SQL est compliqué !</a></li>
+  </ul></li>
+  <li><a href="#quelques-trucs-en-vracs" id="toc-quelques-trucs-en-vracs" class="nav-link" data-scroll-target="#quelques-trucs-en-vracs">Quelques trucs en vracs</a>
+  <ul class="collapse">
+  <li><a href="#utilisez-toujours-la-dernière-version-de-r-et-des-packages-arrow-et-duckdb" id="toc-utilisez-toujours-la-dernière-version-de-r-et-des-packages-arrow-et-duckdb" class="nav-link" data-scroll-target="#utilisez-toujours-la-dernière-version-de-r-et-des-packages-arrow-et-duckdb">Utilisez toujours la dernière version de R et des packages <code>arrow</code> et <code>duckdb</code></a></li>
+  <li><a href="#partitionner-vos-données" id="toc-partitionner-vos-données" class="nav-link" data-scroll-target="#partitionner-vos-données">Partitionner vos données</a></li>
+  <li><a href="#simplifier-lutilisation-des-fichiers-parquet" id="toc-simplifier-lutilisation-des-fichiers-parquet" class="nav-link" data-scroll-target="#simplifier-lutilisation-des-fichiers-parquet">Simplifier l’utilisation des fichiers parquet</a></li>
+  <li><a href="#vous-aurez-peut-être-encore-à-séparer-vos-traitements-en-plusieurs-blocs" id="toc-vous-aurez-peut-être-encore-à-séparer-vos-traitements-en-plusieurs-blocs" class="nav-link" data-scroll-target="#vous-aurez-peut-être-encore-à-séparer-vos-traitements-en-plusieurs-blocs">Vous aurez peut-être (encore) à séparer vos traitements en plusieurs blocs</a></li>
+  <li><a href="#redémarrer-votre-session-de-temps-en-temps" id="toc-redémarrer-votre-session-de-temps-en-temps" class="nav-link" data-scroll-target="#redémarrer-votre-session-de-temps-en-temps">redémarrer votre session de temps en temps</a></li>
+  <li><a href="#pourquoi-faut-il-éviter-dutiliser-arrowopen_dataset...-to_duckdbcon-..." id="toc-pourquoi-faut-il-éviter-dutiliser-arrowopen_dataset...-to_duckdbcon-..." class="nav-link" data-scroll-target="#pourquoi-faut-il-éviter-dutiliser-arrowopen_dataset...-to_duckdbcon-...">Pourquoi faut-il éviter d’utiliser <code>arrow::open_dataset(...) &gt;| to_duckdb(con) |&gt; ...</code></a></li>
+  <li><a href="#plantage-par-manque-de-mémoire" id="toc-plantage-par-manque-de-mémoire" class="nav-link" data-scroll-target="#plantage-par-manque-de-mémoire">Plantage par manque de mémoire</a></li>
+  <li><a href="#fermer-votre-base-de-données" id="toc-fermer-votre-base-de-données" class="nav-link" data-scroll-target="#fermer-votre-base-de-données">Fermer votre base de données</a></li>
+  </ul></li>
+  <li><a href="#quelques-derniers-compléments-sur-duckdb" id="toc-quelques-derniers-compléments-sur-duckdb" class="nav-link" data-scroll-target="#quelques-derniers-compléments-sur-duckdb">Quelques derniers compléments sur <code>duckdb</code></a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a>
+  <ul class="collapse">
+  <li><a href="#duckdb-pour-quoi-faire" id="toc-duckdb-pour-quoi-faire" class="nav-link" data-scroll-target="#duckdb-pour-quoi-faire"><code>duckdb</code> pour quoi faire ?</a></li>
+  <li><a href="#comment-choisir-entre-arrow-et-duckdb" id="toc-comment-choisir-entre-arrow-et-duckdb" class="nav-link" data-scroll-target="#comment-choisir-entre-arrow-et-duckdb">Comment choisir entre <code>arrow</code> et <code>duckdb</code></a></li>
+  <li><a href="#convertir-un-traitement-vers-duckdb-et-dbplyr-ou-pas" id="toc-convertir-un-traitement-vers-duckdb-et-dbplyr-ou-pas" class="nav-link" data-scroll-target="#convertir-un-traitement-vers-duckdb-et-dbplyr-ou-pas">Convertir un traitement vers <code>duckdb</code> et <code>dbplyr</code> (ou pas)</a></li>
+  </ul></li>
+  <li><a href="#quelques-références" id="toc-quelques-références" class="nav-link" data-scroll-target="#quelques-références">Quelques références</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title d-none d-lg-block">Traiter des données massives en R avec <code>duckdb</code></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<p>L’objectif de ce document est de montrer comment utiliser <code>duckdb</code>, il fait suite au <a href="./introduction-donnees-massives-arrow.html">document d’introduction sur arrow</a>.</p>
+<p>Nous commençons par charger quelques packages utiles :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(duckdb)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(arrow)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tictoc)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lubridate)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(glue)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="duckdb-quest-ce-que-cest" class="level2">
+<h2 class="anchored" data-anchor-id="duckdb-quest-ce-que-cest"><code>duckdb</code> qu’est-ce que c’est ?</h2>
+<p><code>duckdb</code> est une base de données embarquée :</p>
+<ul>
+<li>open source</li>
+<li>orientée traitement analytique</li>
+<li>très (très) rapide</li>
+<li>requêtable avec <code>dplyr</code>/<code>dbplyr</code> ou directement en SQL</li>
+<li>qui sait lire les fichiers parquet et interagir avec <code>arrow</code></li>
+<li>qui ne demande (quasiment) aucun paramétrage</li>
+<li>qui tourne à l’intérieur de votre R et n’est accessible que par vous</li>
+<li>qui propose une syntaxe SQL “enrichie” (PIVOT, SAMPLE, SELECT * EXCLUDE…)</li>
+</ul>
+<p><code>duckdb</code> étant une base de données, les packages <code>DBI</code> (R DataBase Interface) et <code>dbplyr</code> (<code>dplyr</code> pour les Bases de données) seront utilisés et rapidement décrits, pour plus d’informations, vous pouvez vous reporter à la documentation <a href="https://www.book.utilitr.org/03_fiches_thematiques/fiche_connexion_bdd">utilitr : se connecter à une base de données</a>.</p>
+<p>En résumé :</p>
+<ul>
+<li><code>duckdb</code> est une base de données</li>
+<li><code>DBI</code> permet de se connecter sur une base de données et de lancer des requêtes</li>
+<li><code>dbplyr</code> permet d’utiliser les fonctions de <code>dplyr</code> et les transforme en requêtes SQL</li>
+</ul>
+<p>Les exemples de la suite sont en R mais <code>duckdb</code> sait aussi travailler avec <a href="https://duckdb.org/docs/api/python/overview.html">python</a> et <a href="https://duckdb.org/docs/api/python/overview.html">plein d’autres langages</a></p>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Quelques éléments sur l’accès aux bases de données en R
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>DBI</code> est le package qui permet d’interagir avec les bases de données. Les commandes principales sont :</p>
+<ul>
+<li><code>DBI::dbConnect()</code> : pour se connecter à une base de données</li>
+<li><code>DBI::dbGetQuery()</code> : exécute une requête et retourne le résultat (pour les requêtes de type SELECT)</li>
+<li><code>DBI::dbExecute()</code> : exécute une requête sans retourner le résultat (pour les requêtes de type CREATE)</li>
+<li><code>DBI::dbDdisconnect()</code> : pour se déconnecter d’une base de données</li>
+</ul>
+<p>Pour plus d’informations, allez voir <a href="https://www.book.utilitr.org/03_fiches_thematiques/fiche_connexion_bdd">la page d’utilitr sur le sujet</a> ou la <a href="https://dbi.r-dbi.org/">documentation de DBI</a></p>
+</div>
+</div>
+</section>
+<section id="petit-retour-vers-arrow" class="level2">
+<h2 class="anchored" data-anchor-id="petit-retour-vers-arrow">Petit retour vers <code>arrow</code></h2>
+<p>Pour commencer nous allons ressortir le jeu de données des courses de taxi new-yorkais de 2009 à 2023 :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>taxi_dir <span class="ot">&lt;-</span> <span class="st">"/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi"</span></span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+
+</div>
+<div class="cell" data-hash="introduction-duckdb_cache/html/taxi_ds_fff4d2a03bffcf58a8aaab0a6bad1e07">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FileSystemDataset with 158 Parquet files
+vendor_name: string
+pickup_datetime: timestamp[ms]
+dropoff_datetime: timestamp[ms]
+passenger_count: int64
+trip_distance: double
+pickup_longitude: double
+pickup_latitude: double
+rate_code: string
+store_and_fwd: string
+dropoff_longitude: double
+dropoff_latitude: double
+payment_type: string
+fare_amount: double
+extra: double
+mta_tax: double
+tip_amount: double
+tolls_amount: double
+total_amount: double
+improvement_surcharge: double
+congestion_surcharge: double
+pickup_location_id: int64
+dropoff_location_id: int64
+year: int32
+month: int32</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">list.files</span>(taxi_dir)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> [1] "year=2009" "year=2010" "year=2011" "year=2012" "year=2013" "year=2014"
+ [7] "year=2015" "year=2016" "year=2017" "year=2018" "year=2019" "year=2020"
+[13] "year=2021" "year=2022"</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">|&gt;</span> <span class="fu">nrow</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 1672590319</code></pre>
+</div>
+</div>
+<p>Nous avons vu dans la session sur <code>arrow</code> que la fonction <code>to_duckdb()</code> permettait de passer des données de <code>arrow</code> à <code>duckdb</code> sans passer par un data frame/tibble intermédiaire.</p>
+<p>Reprenons rapidement cet exemple en cherchant la course avec la distance la plus longue sur janvier 2018 :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/arrow_fe21191c65acdfc51d99fd08c8bd7149">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">|&gt;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2018</span> <span class="sc">&amp;</span> month <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(trip_distance <span class="sc">==</span> <span class="fu">max</span>(trip_distance, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-error">
+<pre><code>Error: Filter expression not supported for Arrow Datasets: trip_distance == max(trip_distance, na.rm = TRUE)
+Call collect() first to pull data into R.</code></pre>
+</div>
+</div>
+<p><code>arrow</code> ne supporte pas (encore ?) le filtre utilisé et nous propose de faire le <code>collect()</code>, donc de récupérer l’ensemble des données en mémoire, avant le filtre, ce qui serait une très mauvaise idée même sur un seul mois de courses…</p>
+<p>Essayons plutôt d’utiliser <code>to_duckdb()</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/arrow_to_duckdb_c8bec29659800413d3a2bc0591c26553">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">|&gt;</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2018</span> <span class="sc">&amp;</span> month <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">to_duckdb</span>() <span class="sc">|&gt;</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(trip_distance <span class="sc">==</span> <span class="fu">max</span>(trip_distance, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 24
+  vendor_name pickup_datetime     dropoff_datetime    passenger_count
+  &lt;chr&gt;       &lt;dttm&gt;              &lt;dttm&gt;                        &lt;dbl&gt;
+1 VTS         2018-01-30 11:41:02 2018-01-30 11:42:09               1
+# ℹ 20 more variables: trip_distance &lt;dbl&gt;, pickup_longitude &lt;dbl&gt;,
+#   pickup_latitude &lt;dbl&gt;, rate_code &lt;chr&gt;, store_and_fwd &lt;chr&gt;,
+#   dropoff_longitude &lt;dbl&gt;, dropoff_latitude &lt;dbl&gt;, payment_type &lt;chr&gt;,
+#   fare_amount &lt;dbl&gt;, extra &lt;dbl&gt;, mta_tax &lt;dbl&gt;, tip_amount &lt;dbl&gt;,
+#   tolls_amount &lt;dbl&gt;, total_amount &lt;dbl&gt;, improvement_surcharge &lt;dbl&gt;,
+#   congestion_surcharge &lt;dbl&gt;, pickup_location_id &lt;dbl&gt;,
+#   dropoff_location_id &lt;dbl&gt;, year &lt;int&gt;, month &lt;int&gt;</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>7.807 sec elapsed</code></pre>
+</div>
+</div>
+<p><code>duckdb</code> sait gérer le filtre utilisé et <code>arrow::to_duckdb()</code> ne matérialise pas les données : il convertit un objet arrow au format duckdb et le passe à <code>duckdb</code> pour réaliser les calculs.</p>
+<p>Nous venons de trouver la ligne avec la distance de course la plus grande parmi des millions de lignes en quelques secondes.</p>
+<p>Pour être complet, même si dans le cas présent cela n’a aucun intérêt, on peut également réaliser l’opération inverse avec <code>arrow::to_arrow()</code> qui reconvertit un objet de <code>duckdb</code> vers <code>arrow</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/arrow_to_duckdb_2_b352b9cba2ad337fc0f1a9dd3eac2d3e">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">|&gt;</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2018</span> <span class="sc">&amp;</span> month <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">to_duckdb</span>() <span class="sc">|&gt;</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(trip_distance <span class="sc">==</span> <span class="fu">max</span>(trip_distance, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">to_arrow</span>() <span class="sc">|&gt;</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 24
+  vendor_name pickup_datetime     dropoff_datetime    passenger_count
+  &lt;chr&gt;       &lt;dttm&gt;              &lt;dttm&gt;                        &lt;int&gt;
+1 VTS         2018-01-30 12:41:02 2018-01-30 12:42:09               1
+# ℹ 20 more variables: trip_distance &lt;dbl&gt;, pickup_longitude &lt;dbl&gt;,
+#   pickup_latitude &lt;dbl&gt;, rate_code &lt;chr&gt;, store_and_fwd &lt;chr&gt;,
+#   dropoff_longitude &lt;dbl&gt;, dropoff_latitude &lt;dbl&gt;, payment_type &lt;chr&gt;,
+#   fare_amount &lt;dbl&gt;, extra &lt;dbl&gt;, mta_tax &lt;dbl&gt;, tip_amount &lt;dbl&gt;,
+#   tolls_amount &lt;dbl&gt;, total_amount &lt;dbl&gt;, improvement_surcharge &lt;dbl&gt;,
+#   congestion_surcharge &lt;dbl&gt;, pickup_location_id &lt;int&gt;,
+#   dropoff_location_id &lt;int&gt;, year &lt;int&gt;, month &lt;int&gt;</code></pre>
+</div>
+</div>
+<p>À ce jour, <code>arrow</code> ne supporte pas les <a href="https://dplyr.tidyverse.org/articles/window-functions.html">fonctions de fenêtre</a> mais passer par <code>duckdb</code> ne pose aucun problème.</p>
+<p>Passer de <code>arrow</code> à <code>duckdb</code> et vice versa fonctionne parfaitement et est très pratique par exemple quand une fonction n’existe pas dans <code>arrow</code> mais n’est pas optimal et peut poser des problèmes sur des gros volumes de données.</p>
+</section>
+<section id="utiliser-duckdb-nativement" class="level2">
+<h2 class="anchored" data-anchor-id="utiliser-duckdb-nativement">Utiliser <code>duckdb</code> nativement</h2>
+<p><code>duckdb</code> est une base de données, pour l’utiliser il faut :</p>
+<ol type="1">
+<li>créer sa base de données</li>
+<li>de se connecter dessus.</li>
+</ol>
+<p>Ceux qui connaissent les “vraies” bases de données savent que ça n’est pas simple mais…</p>
+<p>Commençons par créer une base de données <code>duckdb</code> et ouvrir une connexion qui nous permettra de la manipuler :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>con <span class="ot">&lt;-</span> DBI<span class="sc">::</span><span class="fu">dbConnect</span>(<span class="fu">duckdb</span>())</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Et c’est fini. Nous avons créé une base de données vide anonyme (sans nom et en mémoire) et ouvert une connexion dessus, celle-ci étant disponible dans la variable <code>con</code>.</p>
+<div class="callout-warning callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+gérer les limites des serveurs
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>En pratique, il est <strong>fortement conseillé</strong> de fixer des limites à <code>duckdb</code> en utilisant une chaîne de connexion du type :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">duckdb</span>(), </span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">dbdir =</span> <span class="st">"tuto_duckdb.db"</span>, </span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">config =</span> <span class="fu">list</span>(</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">memory_limit =</span> <span class="st">"10G"</span>,</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">threads =</span> <span class="st">"4"</span>)</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Cette chaîne de connexion va créer une base de données stockée dans un fichier <code>tuto_duckdb.db</code> avec des limites à 10Go de mémoire vive (à adapter à votre quota mémoire) et 4 cœurs. Si <code>duckdb</code> commence à atteindre son quota de mémoire vive, il passera par des fichiers temporaires.</p>
+<p>En utilisant cette connexion, vous vous assurez que vous ne saturerez pas les processeurs serveurs et que vos traitements ne planteront pas faute de mémoire.</p>
+<p>Sur les serveurs actuels, nous recommandons de ne pas dépasser 4 threads, cette directive évoluera avec l’arrivée des futurs serveurs qui disposeront de beaucoup plus de coeurs.</p>
+</div>
+</div>
+<p>On utilise ensuite la fonction <code>tbl()</code> qui va permettre de rendre accessible des données au format parquet (ou autre, nous le verrons plus tard) dans la base de données créée.</p>
+<div class="callout-tip callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Ne mettez pas vos chemins en dur dans votre code
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Plutôt que de répéter partout dans votre code le chemin vers vos fichiers, vous pouvez utiliser <code>glue::glue()</code> qui vient avec le tidyverse. Cette commande va remplacer les chaines entre parenthèse par le contenu de la variable :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/glue_f691553395a7b78ffda693955ee31709">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>glue<span class="sc">::</span><span class="fu">glue</span>(<span class="st">"read_parquet('{taxi_dir}/**/*.parquet')"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>read_parquet('/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi/**/*.parquet')</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>taxi <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="fu">glue</span>(<span class="st">"read_parquet('{taxi_dir}/**/*.parquet')"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><code>dplyr::tbl()</code> va lancer l’ordre passé en deuxième argument, à savoir <code>read_parquet(...)</code> (rien à voir avec <code>arrow::read_parquet()</code>) dans la base de données précédemment créée et cette fonction va mettre à disposition les données des fichiers parquet comme si elles étaient vraiment stockées dans la base de données.</p>
+<p>Un point important : contrairement à <code>arrow::open_dataset()</code> qui prend en argument un répertoire, la fonction <code>read_parquet()</code> de <code>duckdb</code> prend des chemins de fichiers, dans le cas présent, le <code>**/*.parquet</code> veut dire : tous les fichiers avec une extension <code>.parquet</code> présents dans les sous-répertoires de <code>taxi_dir</code>. <code>duckdb</code> saura reconnaître les partitions s’il voit des répertoires nommées dans un motif <code>variable=valeur</code>.</p>
+<p>Nous pouvons visualiser la variable <code>taxi</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/duckdb_naive_3_d99c8bac028cde7cb1bdb9613a445f25">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>taxi</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   table&lt;read_parquet('/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi/**/*.parquet')&gt; [?? x 24]
+# Database: DuckDB v0.9.1 [unknown@Linux 5.4.0-156-generic:R 4.3.1/tuto_duckdb.db]
+   vendor_name pickup_datetime     dropoff_datetime    passenger_count
+   &lt;chr&gt;       &lt;dttm&gt;              &lt;dttm&gt;                        &lt;dbl&gt;
+ 1 VTS         2019-04-01 08:20:31 2019-04-01 08:35:32               2
+ 2 VTS         2019-04-01 08:36:22 2019-04-01 08:37:56               2
+ 3 VTS         2019-04-01 08:39:59 2019-04-01 08:45:40               2
+ 4 VTS         2019-04-01 08:50:58 2019-04-01 09:20:11               2
+ 5 VTS         2019-04-01 08:11:16 2019-04-01 08:12:56               1
+ 6 VTS         2019-04-01 08:14:42 2019-04-01 08:20:59               1
+ 7 VTS         2019-04-01 08:06:10 2019-04-01 08:16:46               1
+ 8 VTS         2019-04-01 08:20:20 2019-04-01 08:29:20               1
+ 9 VTS         2019-04-01 08:30:02 2019-04-01 08:41:32               1
+10 VTS         2019-04-01 08:42:17 2019-04-01 08:45:13               1
+# ℹ more rows
+# ℹ 20 more variables: trip_distance &lt;dbl&gt;, pickup_longitude &lt;dbl&gt;,
+#   pickup_latitude &lt;dbl&gt;, rate_code &lt;chr&gt;, store_and_fwd &lt;chr&gt;,
+#   dropoff_longitude &lt;dbl&gt;, dropoff_latitude &lt;dbl&gt;, payment_type &lt;chr&gt;,
+#   fare_amount &lt;dbl&gt;, extra &lt;dbl&gt;, mta_tax &lt;dbl&gt;, tip_amount &lt;dbl&gt;,
+#   tolls_amount &lt;dbl&gt;, total_amount &lt;dbl&gt;, improvement_surcharge &lt;dbl&gt;,
+#   congestion_surcharge &lt;dbl&gt;, pickup_location_id &lt;dbl&gt;, …</code></pre>
+</div>
+</div>
+<p>dont le contenu ressemble à un dataframe classique mais les premières lignes nous indique qu’il s’agit bien de données stockées dans une base de données dont la source est un dataset parquet.</p>
+<p>Faisons quelques manipulations, nous voulons la distance des courses en km et ajouter une colonne avec le jour de la semaine de la course. <code>dbplyr</code> comprends beaucoup d’ordres du <code>tidyverse</code> et <code>lubridate::wday()</code> en fait partie :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>calcul <span class="ot">&lt;-</span> taxi <span class="sc">|&gt;</span> </span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime),</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">trip_distance =</span> trip_distance <span class="sc">*</span> <span class="fl">1.61</span>)</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>calcul <span class="sc">|&gt;</span></span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(wday, trip_distance)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   SQL [?? x 2]
+# Database: DuckDB 0.9.0 [unknown@Linux 6.2.0-36-generic:R 4.3.2/tuto_duckdb.db]
+    wday trip_distance
+   &lt;dbl&gt;         &lt;dbl&gt;
+ 1     2         1.13 
+ 2     2         1.29 
+ 3     2         4.93 
+ 4     2         0.644
+ 5     2         3.74 
+ 6     2         3.70 
+ 7     2         5.94 
+ 8     2         1.13 
+ 9     2         2.48 
+10     2         2.58 
+# ℹ more rows</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0.099 sec elapsed</code></pre>
+</div>
+</div>
+<p>Ce calcul devrait retourner plusieurs millions de lignes mais s’exécute en quelques ms. Que se passe-t-il ?</p>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+<code>dbplyr</code> et l’évaluation fainéante
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Contrairement à <code>dplyr</code> qui traite les ordres un par un, <code>dbplyr</code> va analyser l’ensemble de vos ordres, les transformer en SQL et l’envoyer à la base de données pour exécution mais de façon très particulière :</p>
+<ul>
+<li>il récupère les données uniquement si vous lui demandez explicitement</li>
+<li>il retarde l’exécution des requêtes le plus possible, quand vous demandez le résultat d’un calcul.</li>
+<li>si vous “prévisualiser” un calcul, il va récupérer seulement quelques lignes</li>
+</ul>
+<p>Pour lui demander explicitement le résultat d’une requête, vous devez utiliser les fonctions :</p>
+<ul>
+<li><code>collect()</code> qui va récupérer les données en mémoire sous la forme d’un <code>tibble</code></li>
+<li><code>compute()</code> qui va créer une table temporaire dans votre base, table que vous pourrez utiliser comme un tibble.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="fichiers-externes-et-jointures" class="level2">
+<h2 class="anchored" data-anchor-id="fichiers-externes-et-jointures">fichiers externes et jointures</h2>
+<p>Dans la suite, nous voudrions étudier les courses de taxi partant des 3 aéroports de New York, le problème est que l’information n’est pas présente dans les données actuelles. Heureusement, le jeu de données contient une colonne <code>pickup_location_id</code> et nous avons la correspondance dans le fichier <code>taxi+_zone_lookup.csv</code> se trouvant dans le répertoire parent de notre dataset sur les courses :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/read_csv_5db8911b0c03815970b8e3575cb0e27e">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"../taxi+_zone_lookup.csv"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">if_any</span>(<span class="fu">everything</span>(), <span class="sc">~</span><span class="fu">str_detect</span>(., <span class="st">"(?i)airport"</span>)))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 4
+  LocationID Borough Zone              service_zone
+       &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;             &lt;chr&gt;       
+1          1 EWR     Newark Airport    EWR         
+2        132 Queens  JFK Airport       Airports    
+3        138 Queens  LaGuardia Airport Airports    </code></pre>
+</div>
+</div>
+<p>Et nous voyons bien les aéroports New Yorkais ! Visiblement les colonnes intéressantes sont LocationID et Zones. Nous allons les sélectionner et normaliser les noms :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>zones <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"../taxi+_zone_lookup.csv"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_location_id =</span> LocationID,</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_zone =</span> Zone</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>zones</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 265 × 2
+   pickup_location_id pickup_zone            
+                &lt;dbl&gt; &lt;chr&gt;                  
+ 1                  1 Newark Airport         
+ 2                  2 Jamaica Bay            
+ 3                  3 Allerton/Pelham Gardens
+ 4                  4 Alphabet City          
+ 5                  5 Arden Heights          
+ 6                  6 Arrochar/Fort Wadsworth
+ 7                  7 Astoria                
+ 8                  8 Astoria Park           
+ 9                  9 Auburndale             
+10                 10 Baisley Park           
+# ℹ 255 more rows</code></pre>
+</div>
+</div>
+<p>Nous devons maintenant mettre à disposition ces données dans la base <code>duckdb</code>, il y a plusieurs façons de le faire mais nous allons en voir deux qui sont sans doute les plus flexibles :</p>
+<ul>
+<li><a href="https://dbplyr.tidyverse.org/reference/copy_to.src_sql.html"><code>DBI::copy_to()</code></a> : qui copie les données d’un dataframe dans la base</li>
+<li><code>duckdb::duckdb_register()</code> qui enregistre les données d’un dataframe comme une table virtuelle sans les copier.</li>
+</ul>
+<p>Nous aurions aussi pu utiliser <a href="https://duckdb.org/docs/data/csv/overview.html">les fonctions d’import CSV de duckdb</a> de <code>duckdb</code> qui sont très efficaces mais elles sont pour le moment limitées au CSV en UTF8 (ce qui est problématique pour beaucoup de vos données) et peuvent poser des problèmes sur des fichiers malformés. Si vous devez traiter des fichiers CSV volumineux (ou qui vous posent problème avec les outils classiques), vous devrez d’abord convertir vos fichiers en UTF8 (passez nous voir, nous pouvons vous aider).</p>
+<section id="dplyrcopy_to" class="level3">
+<h3 class="anchored" data-anchor-id="dplyrcopy_to"><code>dplyr::copy_to()</code></h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">copy_to</span>(con, zones, <span class="st">"zones"</span>, <span class="at">overwrite =</span> <span class="cn">TRUE</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Cette commande va copier dans la base pointée par <code>con</code> le dataframe passées en deuxième argument <code>zones</code> dans une table ayant le nom du troisième argument (et pour éviter les problèmes à la génération de cette documentation j’autorise l’écrasement des données.)</p>
+</section>
+<section id="duckdbduckdb_register" class="level3">
+<h3 class="anchored" data-anchor-id="duckdbduckdb_register"><code>duckdb::duckdb_register()</code></h3>
+<div class="cell" data-hash="introduction-duckdb_cache/html/duckdb_register_ec80999dfeef5fac4653246dbfa9208d">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>duckdb<span class="sc">::</span><span class="fu">duckdb_register</span>(con, <span class="st">"zones_duckdb"</span>, zones)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Cette commande va “enregistrer” les données du troisième argument dans la table nommée par le deuxième argument. Aucune écriture de données n’est réalisée.</p>
+<div class="callout-tip callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Astuce
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si vos données externes (CSV ou autres) sont volumineuses, vous avez intérêt à les convertir en parquet une fois pour toute pour bénéficier de toute la puissance de <code>duckdb</code> plutôt que de les copier ou les enregistrer à chaque fois.</p>
+</div>
+</div>
+</section>
+<section id="la-jointure" class="level3">
+<h3 class="anchored" data-anchor-id="la-jointure">La jointure</h3>
+<p>Maintenant que nos zones sont mises à disposition dans <code>duckdb</code>, nous pouvons y accéder en utilisant <code>tbl()</code> qui peut, évidemment, mettre à disposition une table existante :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/show_zones_10802a255cb7f367639ddaba4bb317b7">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"zones"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   table&lt;zones&gt; [?? x 2]
+# Database: DuckDB v0.9.1 [unknown@Linux 5.4.0-156-generic:R 4.3.1/tuto_duckdb.db]
+   pickup_location_id pickup_zone            
+                &lt;dbl&gt; &lt;chr&gt;                  
+ 1                  1 Newark Airport         
+ 2                  2 Jamaica Bay            
+ 3                  3 Allerton/Pelham Gardens
+ 4                  4 Alphabet City          
+ 5                  5 Arden Heights          
+ 6                  6 Arrochar/Fort Wadsworth
+ 7                  7 Astoria                
+ 8                  8 Astoria Park           
+ 9                  9 Auburndale             
+10                 10 Baisley Park           
+# ℹ more rows</code></pre>
+</div>
+</div>
+<p>Et nous pouvons lancer notre requête pour trouver les distances moyennes des courses par jour de la semaine sur l’année 2016 en filtrant les lignes contenant la chaine <code>airport</code> dans la colonne <code>pickup_zone</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/jointure_0b9e632b31717eae63f57aab54fafeb8">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">glue</span>(<span class="st">"{taxi_dir}/**/*.parquet"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime)) <span class="sc">|&gt;</span></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(<span class="fu">tbl</span>(con, <span class="st">"zones"</span>))<span class="sc">|&gt;</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># (?i) est pour indiquer que la recherche doit chercher toutes les casses</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># majuscule et minuscule</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(pickup_zone, <span class="st">"(?i)airport"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(pickup_zone, wday) <span class="sc">|&gt;</span></span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">mean_trip =</span> <span class="fu">mean</span>(trip_distance)) <span class="sc">|&gt;</span></span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(wday) <span class="sc">|&gt;</span></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> wday, <span class="at">values_from =</span> mean_trip)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 8
+# Groups:   pickup_zone [3]
+  pickup_zone         `1`   `2`   `3`   `4`   `5`   `6`   `7`
+  &lt;chr&gt;             &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+1 LaGuardia Airport  9.87  9.94 10.0  10.1  10.0   9.90  9.82
+2 JFK Airport       18.7  48.9  17.3  15.7  17.3  25.0  15.8 
+3 Newark Airport     2.25  2.09  2.24  2.00  1.93  2.44  2.49</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>5.223 sec elapsed</code></pre>
+</div>
+</div>
+<p><code>dbplyr</code> reconnait énormément de fonctions du <code>tidyverse</code> que ça soit <code>stringr</code>, <code>lubridate</code> ou autre.</p>
+<p>“Et voila”. Pas mal pour un traitement sur plus de 1,6 milliard de lignes et 64Go de volume…</p>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>duckdb</code> analyse la requête dans sa globalité et l’optimise, une des optimisations est au niveau de la lecture en s’appuyant sur le format parquet qui est partitionné et organisé en colonnes.</p>
+<p>Donc <code>duckdb</code> va lire :</p>
+<ol type="1">
+<li>uniquement les fichiers présent dans le répertoire <code>year=2016</code></li>
+<li>juste les colonnes nécessaires, à savoir <code>pickup_datetime</code> pour calculer le jour de la semaine, <code>trip_distance</code> pour la moyenne et bien sûr <code>pickup_location_id</code> pour faire la jointure.</li>
+</ol>
+<p>D’autres optimisations sont réalisées grâce aux métadonnées stockées dans les fichiers parquet mais restons simple.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="petite-comparaison-avec-arrow" class="level2">
+<h2 class="anchored" data-anchor-id="petite-comparaison-avec-arrow">Petite comparaison avec <code>arrow</code></h2>
+<p>Comparons rapidement avec l’implémentation en <code>arrow</code>. Le premier jet ressemble beaucoup à ce que nous avons fait précédemment, sachant que <code>arrow</code> sait convertir à la volée des données d’un dataframe en objet <code>arrow</code> nous allons juste faire :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/comparaison_arrow_1_19bdbad6a15bb0da90a10fe3e901f9d8">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>zones <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"../taxi+_zone_lookup.csv"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_location_id =</span> LocationID,</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_zone =</span> Zone</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">|&gt;</span></span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime)) <span class="sc">|&gt;</span></span>
+<span id="cb40-10"><a href="#cb40-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(zones) <span class="sc">|&gt;</span></span>
+<span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(pickup_zone, <span class="st">"(?i)airport"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb40-12"><a href="#cb40-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(pickup_zone, wday) <span class="sc">|&gt;</span></span>
+<span id="cb40-13"><a href="#cb40-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">mean_trip =</span> <span class="fu">mean</span>(trip_distance, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb40-14"><a href="#cb40-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(wday) <span class="sc">|&gt;</span></span>
+<span id="cb40-15"><a href="#cb40-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
+<span id="cb40-16"><a href="#cb40-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> wday, <span class="at">values_from =</span> mean_trip)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-error">
+<pre><code>Error in `compute.arrow_dplyr_query()`:
+! Invalid: Incompatible data types for corresponding join field keys: FieldRef.Name(pickup_location_id) of type int64 and FieldRef.Name(pickup_location_id) of type double</code></pre>
+</div>
+</div>
+<p>Ha oui, nous avons vu ce problème dans la session sur <code>arrow</code>, celui-ci est très à cheval sur les types des données utilisées dans les jointures, qu’à cela ne tienne, précisons le type de la colonne <code>pickup_location_id</code> et relançons la requête :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/comparaison_arrow_2_f13c30e1ff41ad0884185fcdc55de2ed">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>zones_arrow <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"../taxi+_zone_lookup.csv"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_location_id =</span> LocationID,</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_zone =</span> Zone</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_arrow_table</span>(</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">schema =</span> <span class="fu">schema</span>(</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">pickup_location_id =</span> <span class="fu">int64</span>(),</span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>      <span class="at">pickup_zone =</span> <span class="fu">utf8</span>()</span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">|&gt;</span></span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime)) <span class="sc">|&gt;</span></span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(zones_arrow) <span class="sc">|&gt;</span></span>
+<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(pickup_zone, <span class="st">"(?i)airport"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb42-19"><a href="#cb42-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(pickup_zone, wday) <span class="sc">|&gt;</span></span>
+<span id="cb42-20"><a href="#cb42-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">mean_trip =</span> <span class="fu">mean</span>(trip_distance, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb42-21"><a href="#cb42-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(wday) <span class="sc">|&gt;</span></span>
+<span id="cb42-22"><a href="#cb42-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
+<span id="cb42-23"><a href="#cb42-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> wday, <span class="at">values_from =</span> mean_trip)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 8
+# Groups:   pickup_zone [3]
+  pickup_zone         `1`   `2`   `3`   `4`   `5`   `6`   `7`
+  &lt;chr&gt;             &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+1 LaGuardia Airport  9.87  9.94 10.0  10.1  10.0   9.90  9.82
+2 JFK Airport       18.7  48.9  17.3  15.7  17.3  25.0  15.8 
+3 Newark Airport     2.25  2.09  2.24  2.00  1.93  2.44  2.49</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>11.921 sec elapsed</code></pre>
+</div>
+</div>
+<p>Nous obtenons bien le même résultat mais, dans le cas présent, <code>arrow</code> est beaucoup plus lent que <code>duckdb</code> (et <code>arrow</code> est moins souple sur les types pour les jointures)</p>
+<div class="callout-tip callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+<code>duckdb</code> est très fort en jointure
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Quand vous avez des jointures entre des tables “volumineuses”, privilégiez <code>duckdb</code></p>
+</div>
+</div>
+</section>
+<section id="générer-des-fichiers-intermédiaires-avec-duckdb" class="level2">
+<h2 class="anchored" data-anchor-id="générer-des-fichiers-intermédiaires-avec-duckdb">générer des fichiers intermédiaires avec <code>duckdb</code></h2>
+<p>Que ça soit dans la phase de nettoyage des sources ou dans la phase de calcul finale, il est parfois nécessaire de passer par des fichiers intermédiaires.</p>
+<p>Traditionnellement, on charge les données en mémoire, on les manipule (en mémoire) et on les écrit dans un nouveau fichier. Cette méthode atteint vite ses limites quand on travaille sur des fichiers de plusieurs dizaines voire centaines de gigaoctet tant par les temps de chargement que par la mémoire nécessaire.</p>
+<p>Nous allons prendre un fichier intermédiaire très simple :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="fu">glue</span>(<span class="st">"{taxi_dir}/**/*.parquet"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime)) <span class="sc">|&gt;</span></span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(<span class="fu">tbl</span>(con, <span class="st">"zones"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Joining with `by = join_by(pickup_location_id)`</code></pre>
+</div>
+</div>
+<p>Les données font un peu plus de 100 millions de lignes et les fichiers parquets autour de 2,5Go. Pour avoir un ordre de grandeur, le dataframe fait de l’ordre de 28Go en mémoire.</p>
+<section id="pour-les-fichiers-pérennes-parquet" class="level3">
+<h3 class="anchored" data-anchor-id="pour-les-fichiers-pérennes-parquet">Pour les fichiers pérennes : parquet</h3>
+<p>Si vos fichiers intermédiaires sont pérennes et volumineux, il est recommandé de les générer au format parquet.</p>
+<p>Il y a trois façons de faire ayant des résultats différents en couplant <code>tbl()</code> et les fonctions <code>arrow::write_parquet()</code> et <code>arrow::write_dataset()</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/intermediaire_parquet_1_2eb74d5334b35cf1135270fd113a5c5b">
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>result <span class="sc">|&gt;</span></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_parquet</span>(<span class="st">"fichier_intermediaire_1.parquet"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-hash="introduction-duckdb_cache/html/intermediaire_parquet_2_4f3af999856314bdbc3a990be2229cd1">
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>result <span class="sc">|&gt;</span></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">to_arrow</span>() <span class="sc">|&gt;</span></span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_parquet</span>(<span class="st">"fichier_intermediaire_2.parquet"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-hash="introduction-duckdb_cache/html/intermediaire_parquet_3_fefa21773bd23c7393ed342e059298b1">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>result <span class="sc">|&gt;</span></span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">to_arrow</span>() <span class="sc">|&gt;</span></span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_dataset</span>(<span class="st">"fichier_intermediaire"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<table class="table">
+<thead>
+<tr class="header">
+<th style="text-align: right;">num</th>
+<th>méthode</th>
+<th style="text-align: right;">mémoire</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td><code>tbl() |&gt; collect() |&gt; write_parquet()</code></td>
+<td style="text-align: right;">50Go</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td><code>tbl() |&gt; to_arrow() |&gt; write_parquet()</code></td>
+<td style="text-align: right;">25Go</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td><code>tbl() |&gt; to_arrow() |&gt; write_dataset()</code></td>
+<td style="text-align: right;">15Go</td>
+</tr>
+</tbody>
+</table>
+<p>Toutes ces méthodes ont un inconvénient majeur, elle nécessite de passer de <code>duckdb</code> à <code>arrow</code> et doivent matérialiser plus ou moins de données (soit dans un dataframe, soit dans un objet arrow).</p>
+<ol type="1">
+<li>matérialise l’ensemble des données en mémoire sous la forme d’un dataframe</li>
+<li>matérialise l’ensemble des données en mémoire sous la forme d’un objet arrow</li>
+<li>matérialise les données par morceaux sous forme d’objet arrow</li>
+</ol>
+<p><code>duckdb</code> a une commande <a href="https://duckdb.org/docs/sql/statements/copy.html"><code>COPY</code></a> qui permet d’exporter des données de la base de la forme : <code>COPY {from} TO {to} ({config})</code>.</p>
+<p>Pour copier vers un fichier parquet nous pouvons putiliser le sql généré par la requête et pour ça il existe une fonction pratique <code>DBI::SQL()</code> qui permet de le réutiliser. Nous allons donc stocker la requête :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/intermediaire_parquet_5_1406b181418001aceebef81957140ff8">
+<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>request <span class="ot">&lt;-</span> result <span class="sc">|&gt;</span></span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>  dbplyr<span class="sc">::</span><span class="fu">sql_render</span>(<span class="at">con =</span> con)</span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>request</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;SQL&gt; SELECT LHS.*, pickup_zone
+FROM (
+  SELECT *, EXTRACT('dow' FROM CAST(pickup_datetime AS DATE) + 0) + 1 AS wday
+  FROM "/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi/**/*.parquet"
+  WHERE ("year" = 2016.0)
+) LHS
+LEFT JOIN zones
+  ON (LHS.pickup_location_id = zones.pickup_location_id)</code></pre>
+</div>
+</div>
+<p>Et l’utiliser dans <code>COPY ... TO ...</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/intermediaire_parquet_6_c11288504a4f20901917033d42acf4e7">
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>request <span class="ot">&lt;-</span> result <span class="sc">|&gt;</span></span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sql_render</span>(<span class="at">con =</span> con)</span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(conn, glue<span class="sc">::</span><span class="fu">glue</span>(<span class="st">"COPY ({DBI::SQL(request)}) TO 'monfichier.parquet' (FORMAT PARQUET)"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Cette méthode prend autour de 2Go de mémoire.</p>
+<p>Pour être complet, il est possible d’utiliser uniquement <code>arrow</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/intermediaire_parquet_7_21eab102741b3a195a481db67192e6f4">
+<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">|&gt;</span></span>
+<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime)) <span class="sc">|&gt;</span></span>
+<span id="cb54-4"><a href="#cb54-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_dataset</span>(<span class="st">"fichier_intermediaire"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Cette méthode consomme 7Go de mémoire.</p>
+<p>Le classement final :</p>
+<table class="table">
+<thead>
+<tr class="header">
+<th>méthode</th>
+<th style="text-align: right;">mémoire</th>
+<th style="text-align: right;">temps</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>tbl() |&gt; collect() |&gt; write_parquet()</code></td>
+<td style="text-align: right;">50Go</td>
+<td style="text-align: right;">240s</td>
+</tr>
+<tr class="even">
+<td><code>tbl() |&gt; to_arrow() |&gt; write_parquet()</code></td>
+<td style="text-align: right;">25Go</td>
+<td style="text-align: right;">300s</td>
+</tr>
+<tr class="odd">
+<td><code>tbl() |&gt; to_arrow() |&gt; write_dataset()</code></td>
+<td style="text-align: right;">15Go</td>
+<td style="text-align: right;">305s</td>
+</tr>
+<tr class="even">
+<td><code>open_dataset() |&gt; write_dataset()</code></td>
+<td style="text-align: right;">7Go</td>
+<td style="text-align: right;">325s</td>
+</tr>
+<tr class="odd">
+<td><code>COPY ... TO...</code></td>
+<td style="text-align: right;">2Go</td>
+<td style="text-align: right;">145s</td>
+</tr>
+</tbody>
+</table>
+<p>Un exemple sur la conversion d’un cas réel est disponible <a href="./cas-pratique-traitement-duckdb.html">ici</a></p>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si vous devez utiliser des fichiers intermédiaires pour des données pérennes, utilisez le format parquet.</p>
+<p>Si vos fichiers sources sont vraiment volumineux, <code>duckdb</code> sera plus efficace que <code>arrow</code></p>
+</div>
+</div>
+</section>
+<section id="pour-les-données-à-courte-durée-de-vie" class="level3">
+<h3 class="anchored" data-anchor-id="pour-les-données-à-courte-durée-de-vie">Pour les données à courte durée de vie</h3>
+<p>Plusieurs solutions sont possibles. Vous pouvez bien sûr utiliser parquet comme précédemment mais vous pouvez aussi créer une table dans <code>duckdb</code>. <code>copy_to</code> sait copier des données issues d’une requête <code>dbplyr</code> vers la base de données sans récupérer les données dans R :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/courte_vie_0e07484b7c5880b6bf42383cd1d3592b">
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>request <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="fu">glue</span>(<span class="st">"{taxi_dir}/**/*.parquet"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime)) <span class="sc">|&gt;</span></span>
+<span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span>
+<span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-6"><a href="#cb55-6" aria-hidden="true" tabindex="-1"></a>table_request <span class="ot">&lt;-</span> <span class="fu">copy_to</span>(con, request, <span class="st">"table_request"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Attention, cette requête copie réellement les données en base, elle peut donc prendre un certain temps.</p>
+<p>Vous pouvez maintenant utiliser la variable <code>table_request</code> qui contient en pratique l’équivalent de l’ordre <code>tbl(con, "table_request")</code>.</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/courte_vie_2_20de52f3c3c62416abd6c649d6d99380">
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>table_request</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   table&lt;table_request&gt; [6 x 25]
+# Database: DuckDB v0.9.1 [unknown@Linux 5.4.0-156-generic:R 4.3.1/tuto_duckdb.db]
+  vendor_name pickup_datetime     dropoff_datetime    passenger_count
+  &lt;chr&gt;       &lt;dttm&gt;              &lt;dttm&gt;                        &lt;dbl&gt;
+1 CMT         2016-04-04 15:52:55 2016-04-04 16:15:38               1
+2 VTS         2016-04-04 15:52:55 2016-04-04 16:07:48               1
+3 CMT         2016-04-04 15:52:56 2016-04-04 16:28:01               1
+4 CMT         2016-04-04 15:52:56 2016-04-04 16:18:50               1
+5 VTS         2016-04-04 15:52:56 2016-04-04 16:02:42               1
+6 VTS         2016-04-04 15:52:56 2016-04-04 15:54:40               6
+# ℹ 21 more variables: trip_distance &lt;dbl&gt;, pickup_longitude &lt;dbl&gt;,
+#   pickup_latitude &lt;dbl&gt;, rate_code &lt;chr&gt;, store_and_fwd &lt;chr&gt;,
+#   dropoff_longitude &lt;dbl&gt;, dropoff_latitude &lt;dbl&gt;, payment_type &lt;chr&gt;,
+#   fare_amount &lt;dbl&gt;, extra &lt;dbl&gt;, mta_tax &lt;dbl&gt;, tip_amount &lt;dbl&gt;,
+#   tolls_amount &lt;dbl&gt;, total_amount &lt;dbl&gt;, improvement_surcharge &lt;dbl&gt;,
+#   congestion_surcharge &lt;dbl&gt;, pickup_location_id &lt;dbl&gt;,
+#   dropoff_location_id &lt;dbl&gt;, month &lt;dbl&gt;, year &lt;dbl&gt;, wday &lt;dbl&gt;</code></pre>
+</div>
+</div>
+<div class="callout-warning callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+le format de données de duckdb n’est pas encore stable
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si vous stockez des données en base, à la prochaine mise à jour de <code>duckdb</code>, il vous préviendra au lancement qu’il n’arrive pas à lire le fichier.</p>
+<p>Si ça vous arrive, vous devrez réinstaller l’ancienne version de duckdb, exporter vos données et les réimporter avec la nouvelle version.</p>
+<p>Pour stocker des données au delà de quelques heures/jours, privilégiez le format parquet.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="les-limitations-de-dbplyr" class="level2">
+<h2 class="anchored" data-anchor-id="les-limitations-de-dbplyr">Les limitations de <code>dbplyr</code></h2>
+<p>Comme tous les outils, <code>dbplyr</code> a des limitations :</p>
+<ul>
+<li>tous les ordres <code>dplyr</code> ne sont pas compris (rowwise, …)</li>
+<li>une compréhension de SQL peut vous aider à corriger des erreurs</li>
+<li>globalement incompatible avec les fonctions de R base.</li>
+</ul>
+<p>Et comme pour <code>arrow</code>, certains comportements différents de <code>dplyr</code> peuvent être perturbants :</p>
+<ul>
+<li>certaines astuces R ne passent pas (sommer des booleens…)</li>
+<li><code>stringr</code> accepte une regexp comme <code>[:punct:]</code> (qui n’est normalement pas valide), pour <code>duckdb</code> il faudra utiliser <code>[[:punct:]]</code></li>
+</ul>
+<p>Il y en a certainement d’autres.</p>
+</section>
+<section id="faut-il-passer-à-sql" class="level2">
+<h2 class="anchored" data-anchor-id="faut-il-passer-à-sql">Faut-il passer à SQL ?</h2>
+<p>Ça n’est pas une obligation… mais ça peut être pratique.</p>
+<p><code>duckdb</code> est une base de données, ça veut dire que son langage natif est le SQL et malgré l’expressivité des packages <code>tidyverse</code>, ils ne pourront jamais l’égaler. Par ailleurs, <code>duckdb</code> est orienté traitement statistique, il intègre donc beaucoup de fonctions qui peuvent vous être très utiles.</p>
+<p>Mais commençons tout doucement.</p>
+<section id="des-petits-bouts-de-sql" class="level3">
+<h3 class="anchored" data-anchor-id="des-petits-bouts-de-sql">Des (petits) bouts de SQL</h3>
+<p>Quand <code>dbplyr</code> ne comprend pas une fonction, il la passe directement à la base de données.</p>
+<p>Imaginons que nous voulions trouver la plus grande valeur entre les lignes <code>fare_amount</code> et <code>tip_amount</code>. Avec <code>dplyr</code>, nous pourrions utiliser <code>rowwise</code> mais cette fonction n’est pas connue de <code>duckdb</code> ni de <code>arrow</code>. Nous pouvons utiliser la fonction <code>GREATEST</code> de <code>duckdb</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/passer_sql_1_1010fc977251f0044ea0abf58c639ba1">
+<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a>taxi <span class="sc">|&gt;</span></span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2018</span>, month <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">greatest =</span> <span class="fu">GREATEST</span>(fare_amount, tip_amount)) <span class="sc">|&gt;</span></span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(fare_amount, tip_amount, greatest) <span class="sc">|&gt;</span></span>
+<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>(<span class="dv">3</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   SQL [3 x 3]
+# Database: DuckDB v0.9.1 [unknown@Linux 5.4.0-156-generic:R 4.3.1/tuto_duckdb.db]
+  fare_amount tip_amount greatest
+        &lt;dbl&gt;      &lt;dbl&gt;    &lt;dbl&gt;
+1         7.5       1.65      7.5
+2        28.5       5.86     28.5
+3         8         0         8  </code></pre>
+</div>
+</div>
+<p><code>duckdb</code> est orienté traitement statistique, si vous avez besoin d’une fonction non implémentée en <code>dplyr</code>, elle existe peut-être dans <code>duckdb</code> et en particulier dans les <a href="https://duckdb.org/docs/sql/aggregates.html">fonctions d’agrégat</a></p>
+<p><strong>Ce point est vraiment très pratique</strong> en particulier si vous n’avez pas envie de chercher quelles fonctions de <code>stringr</code> ou <code>lubridate</code> sont traduites. Il suffit d’aller voir les pages de documentation de <code>duckdb</code> et en particulier (mais les autres sont intéressantes aussi !) :</p>
+<ul>
+<li><a href="https://duckdb.org/docs/sql/functions/char.html">les fonctions de chaines de caractères</a></li>
+<li><a href="https://duckdb.org/docs/sql/functions/date">les fonctions de calcul sur les dates</a></li>
+<li><a href="https://duckdb.org/docs/sql/functions/datepart">les fonctions d’extraction d’élements de dates</a></li>
+<li><a href="https://duckdb.org/docs/sql/functions/patternmatching">les fonctions de “pattern matching”</a></li>
+<li>…</li>
+</ul>
+<p>Pour trouver votre bonheur.</p>
+<div class="cell">
+
+</div>
+<p>Un exemple, nous avons une table avec 3 colonnes</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/exemples_duckdb_fonction_2_ad54720c31428c991a6fc8262544a56c">
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"mon_tb"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   table&lt;mon_tb&gt; [2 x 3]
+# Database: DuckDB v0.9.1 [unknown@Linux 5.4.0-156-generic:R 4.3.1/tuto_duckdb.db]
+  adresse                            nom_de_fichier          date      
+  &lt;chr&gt;                              &lt;chr&gt;                   &lt;date&gt;    
+1 1, RUE DE BERCY, 92500 Paris       fichier_1993.csv        2023-09-10
+2 3 rue de bagnolet. 93000 Montreuil nom_de_fichier_2003.csv 2019-03-05</code></pre>
+</div>
+</div>
+<p>et nous voulons :</p>
+<ol type="1">
+<li>normaliser la colonne adresse en passant en minuscule et en ne gardant que les chiffres et les lettres</li>
+<li>récupérer l’année du nom du fichier sous forme d’entier</li>
+<li>avoir la date du 1er janvier de l’année récupérée ci-dessus</li>
+<li>trouver le 1er du mois de la colonne date</li>
+</ol>
+<p>Voici la commande finale en utilisant des ordres <code>duckdb</code>:</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/exemples_duckdb_fonction_3_e51105c9586570412941f13e703885bd">
+<div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"mon_tb"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a>    <span class="co"># [^a-z0-9 ] indique tous les caractères SAUF ceux cités (et ceux entre les deux bornes)</span></span>
+<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a>    <span class="co"># le 'g' final indique que le replacement doit être global</span></span>
+<span id="cb62-5"><a href="#cb62-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">adresse =</span> <span class="fu">REGEXP_REPLACE</span>(<span class="fu">LOWER</span>(adresse), <span class="st">'[^a-z0-9 ]+'</span>, <span class="st">''</span>, <span class="st">'g'</span>),</span>
+<span id="cb62-6"><a href="#cb62-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># on peut mixer les fonctions dplyr avec les fonctions de duckdb</span></span>
+<span id="cb62-7"><a href="#cb62-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">annee_extraite =</span> <span class="fu">as.integer</span>(<span class="fu">REGEXP_EXTRACT</span>(nom_de_fichier, <span class="st">'([0-9]+)'</span>)),</span>
+<span id="cb62-8"><a href="#cb62-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">premier_janvier_annee_extraite =</span> <span class="fu">MAKE_DATE</span>(annee_extraite, 1L, 1L),</span>
+<span id="cb62-9"><a href="#cb62-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">premier_du_mois =</span> <span class="fu">DATE_TRUNC</span>(<span class="st">'month'</span>, date)</span>
+<span id="cb62-10"><a href="#cb62-10" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb62-11"><a href="#cb62-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(adresse, premier_janvier_annee_extraite, premier_du_mois)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   SQL [2 x 3]
+# Database: DuckDB v0.9.1 [unknown@Linux 5.4.0-156-generic:R 4.3.1/tuto_duckdb.db]
+  adresse                           premier_janvier_annee_extr…¹ premier_du_mois
+  &lt;chr&gt;                             &lt;date&gt;                       &lt;date&gt;         
+1 1 rue de bercy 92500 paris        1993-01-01                   2023-09-01     
+2 3 rue de bagnolet 93000 montreuil 2003-01-01                   2019-03-01     
+# ℹ abbreviated name: ¹​premier_janvier_annee_extraite</code></pre>
+</div>
+</div>
+<p>Il est quand même sain d’avertir le lecteur que certaines fonctions viennent de <code>duckdb</code> afin qu’il ne cherche pas des heures dans la documentation de <code>stringr</code> et <code>lubridate</code>, l’utilisation des majuscules me parait une piste intéressante.</p>
+</section>
+<section id="du-sql-spécifique" class="level3">
+<h3 class="anchored" data-anchor-id="du-sql-spécifique">Du SQL spécifique</h3>
+<p><code>duckdb</code> implémente la norme SQL et un peu plus. Voici quelques ordres qui peuvent être intéressants :</p>
+<ul>
+<li><a href="https://duckdb.org/docs/guides/meta/summarize.html">SUMMARIZE</a> : calcul un certain nombre d’aggrégat (min, max, moyenne, …) sur une table</li>
+<li><a href="https://duckdb.org/docs/sql/statements/pivot.html">PIVOT</a> et <a href="https://duckdb.org/docs/sql/statements/unpivot.html">UNPIVOT</a> : similaire à <code>tidyr::pivot_longer</code> et <code>tidyr::pivot_wider</code></li>
+<li>GROUP BY ALL : permet de ne pas répéter les colonnes du SELECT</li>
+<li><a href="https://duckdb.org/docs/sql/query_syntax/select.html">SELECT EXCLUDE</a> : permet d’exclure des colonnes d’un SELECT</li>
+<li><a href="https://duckdb.org/docs/sql/query_syntax/grouping_sets.html">GROUP BY CUBE / GROUP BY GROUPING SETS</a> permet de réaliser plusieurs GROUP BY dans la même requête</li>
+</ul>
+<p>Pour en savoir plus, la documentation de <a href="https://duckdb.org/docs/sql/introduction.html"><code>duckdb</code></a>.</p>
+</section>
+<section id="passer-de-sql-à-dbplyr" class="level3">
+<h3 class="anchored" data-anchor-id="passer-de-sql-à-dbplyr">Passer de SQL à <code>dbplyr</code></h3>
+<p>Quand vous manipulez plusieurs jeux de données importants, il peut être plus pratique/lisible de passer par une vue consolidée avec les jointures déjà faites plutôt que de refaire les left_join/right_join/… à chaque fois et de passer ensuite à <code>dplyr</code>.</p>
+<p>En l’occurrence, nous allons créer une vue consolidée (en SQL, une vue est une table virtuelle qui est calculée en temps réel, aucune donnée n’est stockée), intégrant le nom de la zone de pickup et nous laisserons tout la partie calcul en <code>tidyverse</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/view_5777e6b46e1aba6b64905402f3e76ab5">
+<div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(con, <span class="fu">glue</span>(<span class="st">"CREATE OR REPLACE VIEW courses AS </span></span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a><span class="st">SELECT * FROM</span></span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a><span class="st">  read_parquet('{taxi_dir}/**/*.parquet') AS taxi,</span></span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a><span class="st">  zones</span></span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a><span class="st">WHERE taxi.pickup_location_id = zones.pickup_location_id"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0</code></pre>
+</div>
+</div>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si vous ne savez pas du tout faire de SQL, vous pouvez utiliser la commande <code>dbplyr::sql_render()</code> pour voir ce que fait <code>dbplyr</code> et vous en inspirer :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/sql_render_0808a39bc4eee81c2f56148ffc62ff80">
+<div class="sourceCode cell-code" id="cb66"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="fu">glue</span>(<span class="st">"{taxi_dir}/**/*.parquet"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(<span class="fu">tbl</span>(con, <span class="st">"zones"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb66-3"><a href="#cb66-3" aria-hidden="true" tabindex="-1"></a>  dbplyr<span class="sc">::</span><span class="fu">sql_render</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Joining with `by = join_by(pickup_location_id)`</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;SQL&gt; SELECT
+  "/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi/**/*.parquet".*,
+  pickup_zone
+FROM "/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi/**/*.parquet"
+LEFT JOIN zones
+  ON ("/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi/**/*.parquet".pickup_location_id = zones.pickup_location_id)</code></pre>
+</div>
+</div>
+</div>
+</div>
+<p>Vous pouvez maintenant utilisez la vue <code>courses</code> qui intègre les données des zones y compris les noms :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/tbl_courses_b27fdcfb7a359382627a7171b6764782">
+<div class="sourceCode cell-code" id="cb69"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"courses"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   table&lt;courses&gt; [?? x 26]
+# Database: DuckDB v0.9.1 [unknown@Linux 5.4.0-156-generic:R 4.3.1/tuto_duckdb.db]
+   vendor_name pickup_datetime     dropoff_datetime    passenger_count
+   &lt;chr&gt;       &lt;dttm&gt;              &lt;dttm&gt;                        &lt;dbl&gt;
+ 1 CMT         2019-04-01 09:25:13 2019-04-01 09:45:09               2
+ 2 CMT         2019-04-01 09:48:12 2019-04-01 10:12:30               1
+ 3 VTS         2019-04-01 09:39:09 2019-04-01 10:04:10               6
+ 4 VTS         2019-04-01 09:24:43 2019-04-01 09:40:21               3
+ 5 CMT         2019-04-01 09:07:50 2019-04-01 09:11:33               1
+ 6 CMT         2019-04-01 09:19:22 2019-04-01 09:35:09               1
+ 7 CMT         2019-04-01 09:40:28 2019-04-01 09:51:47               1
+ 8 CMT         2019-04-01 09:53:09 2019-04-01 09:59:47               1
+ 9 VTS         2019-04-01 09:09:56 2019-04-01 09:24:01               1
+10 VTS         2019-04-01 09:27:16 2019-04-01 09:43:27               1
+# ℹ more rows
+# ℹ 22 more variables: trip_distance &lt;dbl&gt;, pickup_longitude &lt;dbl&gt;,
+#   pickup_latitude &lt;dbl&gt;, rate_code &lt;chr&gt;, store_and_fwd &lt;chr&gt;,
+#   dropoff_longitude &lt;dbl&gt;, dropoff_latitude &lt;dbl&gt;, payment_type &lt;chr&gt;,
+#   fare_amount &lt;dbl&gt;, extra &lt;dbl&gt;, mta_tax &lt;dbl&gt;, tip_amount &lt;dbl&gt;,
+#   tolls_amount &lt;dbl&gt;, total_amount &lt;dbl&gt;, improvement_surcharge &lt;dbl&gt;,
+#   congestion_surcharge &lt;dbl&gt;, pickup_location_id &lt;dbl&gt;, …</code></pre>
+</div>
+</div>
+<div class="cell" data-hash="introduction-duckdb_cache/html/view_request_ffbe13786d7285642b8f09232392d664">
+<div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"courses"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime)) <span class="sc">|&gt;</span></span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(pickup_zone, <span class="st">"irport"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(pickup_zone, wday) <span class="sc">|&gt;</span></span>
+<span id="cb71-6"><a href="#cb71-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">mean_trip =</span> <span class="fu">mean</span>(trip_distance, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb71-7"><a href="#cb71-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(wday) <span class="sc">|&gt;</span></span>
+<span id="cb71-8"><a href="#cb71-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
+<span id="cb71-9"><a href="#cb71-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> wday, <span class="at">values_from =</span> mean_trip)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>`summarise()` has grouped output by "pickup_zone". You can override using the
+`.groups` argument.</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 8
+# Groups:   pickup_zone [3]
+  pickup_zone         `1`   `2`   `3`   `4`   `5`   `6`   `7`
+  &lt;chr&gt;             &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+1 Newark Airport     2.25  2.09  2.24  2.00  1.93  2.44  2.49
+2 LaGuardia Airport  9.87  9.94 10.0  10.1  10.0   9.90  9.82
+3 JFK Airport       18.7  48.9  17.3  15.7  17.3  25.0  15.8 </code></pre>
+</div>
+</div>
+</section>
+<section id="passer-de-dbplyr-à-sql" class="level3">
+<h3 class="anchored" data-anchor-id="passer-de-dbplyr-à-sql">Passer de <code>dbplyr</code> à SQL</h3>
+<p>La première question est “pourquoi voudrais-je faire ça ?”. Pour utiliser une fonction de <code>duckdb</code> par exemple <code>SUMMARIZE</code> ?</p>
+<p>Passer de <code>dbplyr</code> à SQL est (un peu) plus compliqué que de passer de SQL à <code>dbplyr</code> que nous avons vu juste avant. Il faut obligatoirement utiliser un “stockage” temporaire.</p>
+<section id="passer-par-une-table" class="level4">
+<h4 class="anchored" data-anchor-id="passer-par-une-table">Passer par une table</h4>
+<p>Une première solution est d’utiliser une propriété de <code>dplyr::copy_to()</code> qui, quand on lui passe des ordres <code>dplyr</code>, va les copier dans une table de la base de données passée en paramètre :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb74"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a>courses_janvier_2016 <span class="ot">&lt;-</span> <span class="fu">tbl</span>(con, <span class="fu">glue</span>(<span class="st">"read_parquet('{taxi_dir}/**/*.parquet')"</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>, month <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
+<span id="cb74-3"><a href="#cb74-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">wday =</span> <span class="fu">wday</span>(pickup_datetime)) <span class="sc">|&gt;</span></span>
+<span id="cb74-4"><a href="#cb74-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span>
+<span id="cb74-5"><a href="#cb74-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb74-6"><a href="#cb74-6" aria-hidden="true" tabindex="-1"></a><span class="co"># j'utilise `overwrite = TRUE` dans le cadre de la génération de ce document,</span></span>
+<span id="cb74-7"><a href="#cb74-7" aria-hidden="true" tabindex="-1"></a><span class="co"># vous n'en avez pas forcément besoin</span></span>
+<span id="cb74-8"><a href="#cb74-8" aria-hidden="true" tabindex="-1"></a>nouvelle_table <span class="ot">&lt;-</span> <span class="fu">copy_to</span>(con, courses_janvier_2016, <span class="st">"courses_janvier_2016"</span>, <span class="at">overwrite =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb74-9"><a href="#cb74-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb74-10"><a href="#cb74-10" aria-hidden="true" tabindex="-1"></a>nouvelle_table</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   table&lt;courses_janvier_2016&gt; [6 x 25]
+# Database: DuckDB 0.9.0 [unknown@Linux 6.2.0-36-generic:R 4.3.2/tuto_duckdb.db]
+  vendor_name pickup_datetime     dropoff_datetime    passenger_count
+  &lt;chr&gt;       &lt;dttm&gt;              &lt;dttm&gt;                        &lt;dbl&gt;
+1 CMT         2016-01-01 01:39:49 2016-01-01 02:00:25               2
+2 VTS         2016-01-01 01:39:49 2016-01-01 01:52:50               1
+3 VTS         2016-01-01 01:39:49 2016-01-01 01:48:16               1
+4 VTS         2016-01-01 01:39:49 2016-01-01 01:43:51               1
+5 VTS         2016-01-01 01:39:49 2016-01-01 01:46:31               1
+6 VTS         2016-01-01 01:39:49 2016-01-01 01:46:15               1
+# ℹ 21 more variables: trip_distance &lt;dbl&gt;, pickup_longitude &lt;dbl&gt;,
+#   pickup_latitude &lt;dbl&gt;, rate_code &lt;chr&gt;, store_and_fwd &lt;chr&gt;,
+#   dropoff_longitude &lt;dbl&gt;, dropoff_latitude &lt;dbl&gt;, payment_type &lt;chr&gt;,
+#   fare_amount &lt;dbl&gt;, extra &lt;dbl&gt;, mta_tax &lt;dbl&gt;, tip_amount &lt;dbl&gt;,
+#   tolls_amount &lt;dbl&gt;, total_amount &lt;dbl&gt;, improvement_surcharge &lt;dbl&gt;,
+#   congestion_surcharge &lt;dbl&gt;, pickup_location_id &lt;dbl&gt;,
+#   dropoff_location_id &lt;dbl&gt;, month &lt;dbl&gt;, year &lt;dbl&gt;, wday &lt;dbl&gt;</code></pre>
+</div>
+</div>
+<p>Vous pouvez maintenant utiliser des functions <code>dplyr</code> sur la variable <code>nouvelle_table</code> :</p>
+<p><strong>Attention</strong>, cette méthode copie réellement les données dans une table temporaire et va donc prendre du temps et de la place.</p>
+</section>
+<section id="passer-par-une-vue" class="level4">
+<h4 class="anchored" data-anchor-id="passer-par-une-vue">Passer par une vue</h4>
+<p>Une deuxième solution est de créer une vue SQL qui ne copiera aucune donnée, pour cela nous allons capturer le SQL générer par <code>dbplyr</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb76"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a>sql <span class="ot">&lt;-</span> courses_janvier_2016 <span class="sc">|&gt;</span> </span>
+<span id="cb76-2"><a href="#cb76-2" aria-hidden="true" tabindex="-1"></a>  dbplyr<span class="sc">::</span><span class="fu">sql_render</span>(<span class="at">con =</span> con) <span class="sc">|&gt;</span></span>
+<span id="cb76-3"><a href="#cb76-3" aria-hidden="true" tabindex="-1"></a>  DBI<span class="sc">::</span><span class="fu">SQL</span>()</span>
+<span id="cb76-4"><a href="#cb76-4" aria-hidden="true" tabindex="-1"></a>sql</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;SQL&gt; SELECT *, EXTRACT('dow' FROM CAST(pickup_datetime AS DATE) + 0) + 1 AS wday
+FROM read_parquet('/home/nc/travail/R/Rexploration/rdata/nyc-taxi//**/*.parquet')
+WHERE ("year" = 2016.0) AND ("month" = 1.0)
+LIMIT 6</code></pre>
+</div>
+</div>
+<p>et l’utiliser pour créer une vue avec <code>duckdb</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb78"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(con, <span class="fu">glue</span>(<span class="st">"CREATE OR REPLACE VIEW courses_janvier_2016 AS ({sql})"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0</code></pre>
+</div>
+</div>
+<p>Vous pouvez maintenant utiliser la vue <code>courses_janvier_2016</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/dplyr_to_sql_4_d00e76ebc021ccd7ee6fb30619fd0705">
+<div class="sourceCode cell-code" id="cb80"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"courses_janvier_2016"</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># Source:   table&lt;courses_janvier_2016&gt; [6 x 25]
+# Database: DuckDB v0.9.1 [unknown@Linux 5.4.0-156-generic:R 4.3.1/tuto_duckdb.db]
+  vendor_name pickup_datetime     dropoff_datetime    passenger_count
+  &lt;chr&gt;       &lt;dttm&gt;              &lt;dttm&gt;                        &lt;dbl&gt;
+1 CMT         2016-01-01 01:39:49 2016-01-01 02:00:25               2
+2 VTS         2016-01-01 01:39:49 2016-01-01 01:52:50               1
+3 VTS         2016-01-01 01:39:49 2016-01-01 01:48:16               1
+4 VTS         2016-01-01 01:39:49 2016-01-01 01:43:51               1
+5 VTS         2016-01-01 01:39:49 2016-01-01 01:46:31               1
+6 VTS         2016-01-01 01:39:49 2016-01-01 01:46:15               1
+# ℹ 21 more variables: trip_distance &lt;dbl&gt;, pickup_longitude &lt;dbl&gt;,
+#   pickup_latitude &lt;dbl&gt;, rate_code &lt;chr&gt;, store_and_fwd &lt;chr&gt;,
+#   dropoff_longitude &lt;dbl&gt;, dropoff_latitude &lt;dbl&gt;, payment_type &lt;chr&gt;,
+#   fare_amount &lt;dbl&gt;, extra &lt;dbl&gt;, mta_tax &lt;dbl&gt;, tip_amount &lt;dbl&gt;,
+#   tolls_amount &lt;dbl&gt;, total_amount &lt;dbl&gt;, improvement_surcharge &lt;dbl&gt;,
+#   congestion_surcharge &lt;dbl&gt;, pickup_location_id &lt;dbl&gt;,
+#   dropoff_location_id &lt;dbl&gt;, month &lt;dbl&gt;, year &lt;dbl&gt;, wday &lt;dbl&gt;</code></pre>
+</div>
+</div>
+</section>
+<section id="avantageinconvénient" class="level4">
+<h4 class="anchored" data-anchor-id="avantageinconvénient">Avantage/inconvénient</h4>
+<p>La première méthode devra générer les données, ce qui prendra du temps et de l’espace disque, mais les calculs ultérieurs seront plus rapides, la deuxième ne génère aucune copie mais les calculs ultérieurs seront plus lents. La meilleure solution dépendra de votre cas.</p>
+</section>
+</section>
+<section id="sql-est-compliqué" class="level3">
+<h3 class="anchored" data-anchor-id="sql-est-compliqué">SQL est compliqué !</h3>
+<p>Dans cette partie, nous allons voir exemple de conversion d’un calcul réel de <code>data.table</code> à SQL en passant par <code>dplyr</code>. Cette exemple est tiré du même cas réel que celui traité <a href="./cas-pratique-traitement-duckdb.html">ici</a>.</p>
+<p>La version initiale sépare le traitement en dix sous-traitements et les réunis à la fin :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/trivar_1_b5c03ae3e786f837a8bb9ef623ea7238">
+<div class="sourceCode cell-code" id="cb82"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a>calcul_total_trivar <span class="ot">&lt;-</span> <span class="cf">function</span>(var1,var2,var3){</span>
+<span id="cb82-2"><a href="#cb82-2" aria-hidden="true" tabindex="-1"></a>  full_data <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="dv">0</span><span class="sc">:</span><span class="dv">9</span>, <span class="cf">function</span>(i){</span>
+<span id="cb82-3"><a href="#cb82-3" aria-hidden="true" tabindex="-1"></a>    data_etude <span class="ot">&lt;-</span> <span class="fu">read_parquet</span>(<span class="fu">paste0</span>(chemin_export_tables,<span class="st">"data_etude_"</span>,i,<span class="st">".parquet"</span>),<span class="at">col_select=</span><span class="fu">c</span>(<span class="st">"year"</span>,var1,var2,var3)) <span class="sc">%&gt;%</span></span>
+<span id="cb82-4"><a href="#cb82-4" aria-hidden="true" tabindex="-1"></a>      <span class="fu">filter</span>(year <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">2012</span>,<span class="dv">2019</span>,<span class="dv">2021</span>,<span class="dv">2022</span>))</span>
+<span id="cb82-5"><a href="#cb82-5" aria-hidden="true" tabindex="-1"></a>    stat_annee <span class="ot">&lt;-</span> data_etude[  , .(<span class="at">total =</span> <span class="fu">sum</span>(<span class="fu">eval</span>(<span class="fu">parse</span>(<span class="at">text=</span>(var1))), <span class="at">na.rm=</span><span class="cn">TRUE</span>)), by<span class="ot">=</span><span class="fu">c</span>(<span class="st">"year"</span>,var2,var3)]</span>
+<span id="cb82-6"><a href="#cb82-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">rm</span>(<span class="st">"data_etude"</span>)</span>
+<span id="cb82-7"><a href="#cb82-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(stat_annee)</span>
+<span id="cb82-8"><a href="#cb82-8" aria-hidden="true" tabindex="-1"></a>  })</span>
+<span id="cb82-9"><a href="#cb82-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb82-10"><a href="#cb82-10" aria-hidden="true" tabindex="-1"></a>  full_data <span class="ot">&lt;-</span> <span class="fu">rbindlist</span>(full_data)</span>
+<span id="cb82-11"><a href="#cb82-11" aria-hidden="true" tabindex="-1"></a>  formula <span class="ot">&lt;-</span> <span class="fu">as.formula</span>(<span class="fu">paste0</span>(<span class="fu">paste</span>(var2,var3,<span class="at">sep=</span><span class="st">"+"</span>),<span class="st">"~year"</span>))</span>
+<span id="cb82-12"><a href="#cb82-12" aria-hidden="true" tabindex="-1"></a>  total_var1_var2_var3 <span class="ot">&lt;-</span> <span class="fu">dcast</span>(<span class="at">data=</span>full_data,formula,<span class="at">fun.aggregate=</span>sum)</span>
+<span id="cb82-13"><a href="#cb82-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(total_var1_var2_var3)</span>
+<span id="cb82-14"><a href="#cb82-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb82-15"><a href="#cb82-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb82-16"><a href="#cb82-16" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb82-17"><a href="#cb82-17" aria-hidden="true" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">calcul_total_trivar</span>(<span class="st">"parc_01_01"</span>, <span class="st">"co2_reel_tr"</span>, <span class="st">"crit_air"</span>)</span>
+<span id="cb82-18"><a href="#cb82-18" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>(et après on dit que SQL est compliqué…)</p>
+<p>La version <code>dbplyr</code> est nettement plus lisible :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/trivar_2_45082cb360edaf91d1c92ff8b8a11119">
+<div class="sourceCode cell-code" id="cb83"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a>dbplyr_calcul_total_trivar <span class="ot">&lt;-</span> <span class="cf">function</span>(var1, var2, var3) {</span>
+<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tbl</span>(con, <span class="st">"output/etude/**/*.parquet"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb83-3"><a href="#cb83-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(year <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">2012</span>,<span class="dv">2019</span>,<span class="dv">2021</span>,<span class="dv">2022</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb83-4"><a href="#cb83-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(year, {{var2}}, {{var3}}) <span class="sc">%&gt;%</span></span>
+<span id="cb83-5"><a href="#cb83-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="at">total =</span> <span class="fu">sum</span>({{var1}}, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb83-6"><a href="#cb83-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">collect</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb83-7"><a href="#cb83-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> year, <span class="at">values_from =</span> total) <span class="sc">%&gt;%</span></span>
+<span id="cb83-8"><a href="#cb83-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">arrange</span>({{var2}}, {{var3}})</span>
+<span id="cb83-9"><a href="#cb83-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb83-10"><a href="#cb83-10" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb83-11"><a href="#cb83-11" aria-hidden="true" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">dbplyr_calcul_total_trivar</span>(parc_01_01, co2_reel_tr, crit_air)</span>
+<span id="cb83-12"><a href="#cb83-12" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Mais <code>duckdb</code> a une fonction <code>pivot</code> qui fait tout le travail pour nous et voici la version finale :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/trivar_3_6c828e8a5cce5f49484cae864a12c56f">
+<div class="sourceCode cell-code" id="cb84"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a>dbuckdb_calcul_total_trivar <span class="ot">&lt;-</span> <span class="cf">function</span>(var1, var2, var3) {</span>
+<span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a>  DBI<span class="sc">::</span><span class="fu">dbGetQuery</span>(con, glue<span class="sc">::</span><span class="fu">glue</span>(<span class="st">"</span></span>
+<span id="cb84-3"><a href="#cb84-3" aria-hidden="true" tabindex="-1"></a><span class="st">  PIVOT read_parquet('output/etude/**/*.parquet')</span></span>
+<span id="cb84-4"><a href="#cb84-4" aria-hidden="true" tabindex="-1"></a><span class="st">  ON year IN (2012, 2019, 2021, 2022)</span></span>
+<span id="cb84-5"><a href="#cb84-5" aria-hidden="true" tabindex="-1"></a><span class="st">  USING SUM({var1})</span></span>
+<span id="cb84-6"><a href="#cb84-6" aria-hidden="true" tabindex="-1"></a><span class="st">  GROUP BY {var2}, {var3}</span></span>
+<span id="cb84-7"><a href="#cb84-7" aria-hidden="true" tabindex="-1"></a><span class="st">  ORDER BY {var2}, {var3}"</span>))</span>
+<span id="cb84-8"><a href="#cb84-8" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb84-9"><a href="#cb84-9" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb84-10"><a href="#cb84-10" aria-hidden="true" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">duckdb_calcul_total_trivar</span>(<span class="st">"parc_01_01"</span>, <span class="st">"co2_reel_tr"</span>, <span class="st">"crit_air"</span>)</span>
+<span id="cb84-11"><a href="#cb84-11" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>La version initiale met 140s et utilise 4,5Go de mémoire, les deux versions <code>dplyr</code> et <code>duckdb</code> utilise 400Mo et mettent 10s. Est-ce qu’il y a vraiment un avantage à passer à SQL ? A vous de voir.</p>
+<div class="callout-note callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Petit point sur le fonctionnement de <code>duckdb</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>duckdb</code> est une base de données à part entière, à savoir que le traitement d’une requête intègre une phase de planification et d’optimisation. <code>duckdb</code> va analyser les différentes façons possible d’exécuter la requête et choisir celle qui lui semble la plus pertinente.</p>
+<p>Vous pouvez voir le plan d’exécution en utilisant la commande <code>EXPLAIN</code> :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/unnamed-chunk-1_b134c17499d4b5e9bc24f36e7dc0d00c">
+<div class="sourceCode cell-code" id="cb85"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb85-1"><a href="#cb85-1" aria-hidden="true" tabindex="-1"></a><span class="kw">EXPLAIN</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> tbl;</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Il est par ailleurs multi-processeurs. Suivant les tâches qu’il a à effectuer, il pourra les scinder et les faire exécuter en parallèle par différent processeurs (d’où le paramètre <code>threads</code> que nous passons en paramètre).</p>
+</div>
+</div>
+</section>
+</section>
+<section id="quelques-trucs-en-vracs" class="level2">
+<h2 class="anchored" data-anchor-id="quelques-trucs-en-vracs">Quelques trucs en vracs</h2>
+<section id="utilisez-toujours-la-dernière-version-de-r-et-des-packages-arrow-et-duckdb" class="level3">
+<h3 class="anchored" data-anchor-id="utilisez-toujours-la-dernière-version-de-r-et-des-packages-arrow-et-duckdb">Utilisez toujours la dernière version de R et des packages <code>arrow</code> et <code>duckdb</code></h3>
+<p><code>arrow</code> et <code>duckdb</code> sont encore jeunes et évoluent très rapidement, il est fortement conseillé d’utiliser les dernières versions et sur les serveurs du SDES d’utiliser la dernière version de R.</p>
+</section>
+<section id="partitionner-vos-données" class="level3">
+<h3 class="anchored" data-anchor-id="partitionner-vos-données">Partitionner vos données</h3>
+<p>Ce point n’est pas vraiment un “truc” mais plutôt une “base” : si une variable est souvent utilisée dans un filtre, une partition peut vous permettre de réduire vos temps d’au moins un ordre de grandeur voire plus.</p>
+<p>Et évidemment, la commande <code>COPY ... TO ...</code> de <code>duckdb</code> permet de partitionner :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/partition_c2097e33b843522cbba170f6c22e7a1e">
+<div class="sourceCode cell-code" id="cb86"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb86-1"><a href="#cb86-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(con, glue<span class="sc">::</span><span class="fu">glue</span>(<span class="st">"COPY (SELECT * FROM courses_taxi) </span></span>
+<span id="cb86-2"><a href="#cb86-2" aria-hidden="true" tabindex="-1"></a><span class="st">                          TO 'dataset_par_annee' (FORMAT PARQUET, PARTITION_BY (year, month))"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="simplifier-lutilisation-des-fichiers-parquet" class="level3">
+<h3 class="anchored" data-anchor-id="simplifier-lutilisation-des-fichiers-parquet">Simplifier l’utilisation des fichiers parquet</h3>
+<p>Il peut être assez lassant de devoir utiliser à chaque fois le nom complet du fichier ou du dataset parquet. Pour éviter ça, vous pouvez passer par une vue :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb87"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb87-1"><a href="#cb87-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(con, glue<span class="sc">::</span><span class="fu">glue</span>(<span class="st">"CREATE OR REPLACE VIEW courses_taxi AS</span></span>
+<span id="cb87-2"><a href="#cb87-2" aria-hidden="true" tabindex="-1"></a><span class="st">                          SELECT * FROM read_parquet('{taxi_dir}/**/*.parquet')"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Dans la suite de votre code vous pourrez utiliser directement <code>courses_taxi</code> soit dans un appel à <code>tbl()</code> soit dans une requête :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/parquet_vue_2_7ad011f0a11a415a9785db0248b87de4">
+<div class="sourceCode cell-code" id="cb88"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb88-1"><a href="#cb88-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbGetQuery</span>(con, <span class="st">"SELECT * FROM courses_taxi LIMIT 1"</span>)</span>
+<span id="cb88-2"><a href="#cb88-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb88-3"><a href="#cb88-3" aria-hidden="true" tabindex="-1"></a><span class="fu">tbl</span>(con, <span class="st">"courses_taxi"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb88-4"><a href="#cb88-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb88-5"><a href="#cb88-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="vous-aurez-peut-être-encore-à-séparer-vos-traitements-en-plusieurs-blocs" class="level3">
+<h3 class="anchored" data-anchor-id="vous-aurez-peut-être-encore-à-séparer-vos-traitements-en-plusieurs-blocs">Vous aurez peut-être (encore) à séparer vos traitements en plusieurs blocs</h3>
+<p><code>duckdb</code> sait gérer les limites mémoires par débordement : quand il n’a plus assez de mémoire il écrit sur disque. Evidemment, ce mécanisme de débordement implique des temps de traitement nettement plus long (au moins un ordre de grandeur).</p>
+<p>Dans ces cas là, il peut être vraiment intéressant de revenir à un traitement par bloc. Vous pouvez bien sûr le faire en filtrant (<code>dlyr::filter( ...)</code>) sur vos fichiers parquet et idéalement en filtrant sur une partition parquet pour être efficace.</p>
+</section>
+<section id="redémarrer-votre-session-de-temps-en-temps" class="level3">
+<h3 class="anchored" data-anchor-id="redémarrer-votre-session-de-temps-en-temps">redémarrer votre session de temps en temps</h3>
+<p><code>duckdb</code> a tendance à consommer de la mémoire qui n’est jamais libérée. Redémarrer votre session de temps en temps :</p>
+<p>Menu Session =&gt; Restart R</p>
+</section>
+<section id="pourquoi-faut-il-éviter-dutiliser-arrowopen_dataset...-to_duckdbcon-..." class="level3">
+<h3 class="anchored" data-anchor-id="pourquoi-faut-il-éviter-dutiliser-arrowopen_dataset...-to_duckdbcon-...">Pourquoi faut-il éviter d’utiliser <code>arrow::open_dataset(...) &gt;| to_duckdb(con) |&gt; ...</code></h3>
+<p>Cette méthode est tout à fait valide, d’autant qu’on peut passer une connexion (avec ses limites) à <code>to_duckdb()</code></p>
+<p>Néanmoins, même si <code>arrow::open_dataset(...) &gt;| to_duckdb()</code> passe uniquement un objet, une partie du traitement sera réalisée par <code>arrow</code> et une partie par <code>duckdb</code>, les deux consommeront de la mémoire et la limite mémoire que vous aurez fixée ne s’appliqueront qu’à <code>duckdb()</code>.</p>
+<p>(De la même façon, n’utilisez jamais <code>duckdb::duckdb_register()</code> sur un objet <code>arrow</code>, ça marchera mais ne sera pas optimisé.)</p>
+<p>Avec <code>tbl()</code>, la limite mémoire sera entièrement gérée par <code>duckdb</code> et donc respectée.</p>
+<p>Sur des datasets de petite taille vous ne verrez pas d’impact mais sur sur des tailles conséquentes c’est toute la différence entre un traitement qui aboutit et un traitement qui s’arrête au milieu faute de mémoire.</p>
+</section>
+<section id="plantage-par-manque-de-mémoire" class="level3">
+<h3 class="anchored" data-anchor-id="plantage-par-manque-de-mémoire">Plantage par manque de mémoire</h3>
+<p>Dans certains cas très particuliers, j’ai constaté que mes traitements sur des fichiers volumineux pouvaient planter pour un problème de mémoire sur un simple <code>COPY ... TO ...</code> . Ceci peut être dû à un fichier bizarrement créé. Je ne détaillerais pas d’où vient le problème mais vous pouvez vérifier en passant la commande suivante :</p>
+<div class="cell">
+
+</div>
+<div class="cell" data-hash="introduction-duckdb_cache/html/plantage_1_4deffef8f565f0e69573a430cc153f56">
+<div class="sourceCode cell-code" id="cb89"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb89-1"><a href="#cb89-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbGetQuery</span>(con, <span class="fu">glue</span>(<span class="st">"SELECT row_group_num_rows, (row_group_bytes / 1024 ^ 2) AS row_group_megaoctet</span></span>
+<span id="cb89-2"><a href="#cb89-2" aria-hidden="true" tabindex="-1"></a><span class="st">                     FROM parquet_metadata('{fichier_problematique}') LIMIT 1"</span>))</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  row_group_num_rows row_group_megaoctet
+1            7066766            747.6689</code></pre>
+</div>
+</div>
+<p>Si la colonne <code>row_group_num_rows</code> est bien supérieure à 1 000 000 et la colonne <code>row_group_megaoctet</code> est proche voire supérieure au Go comme ici , le problème peut venir de là. Une solution est de réduire le nombre de threads de duckdb à “1” le temps de passer le traitement :</p>
+<div class="cell" data-hash="introduction-duckdb_cache/html/r_plantage_2_31c003c7ce232b6f18db30bbc3e234ab">
+<div class="sourceCode cell-code" id="cb91"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb91-1"><a href="#cb91-1" aria-hidden="true" tabindex="-1"></a>con <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
+<span id="cb91-2"><a href="#cb91-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">duckdb</span>(), </span>
+<span id="cb91-3"><a href="#cb91-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">dbdir =</span> <span class="st">"tuto_duckdb.db"</span>, </span>
+<span id="cb91-4"><a href="#cb91-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">config =</span> <span class="fu">list</span>(</span>
+<span id="cb91-5"><a href="#cb91-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">memory_limit =</span> <span class="st">"10G"</span>,</span>
+<span id="cb91-6"><a href="#cb91-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">threads =</span> <span class="st">"1"</span>)</span>
+<span id="cb91-7"><a href="#cb91-7" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Si vous utilisez régulièrement ce fichier, il peut être intéressant de le corriger définitivement, un <code>COPY ... TO ...</code> ou <code>open_dataset() |&gt; write_dataset()</code> suffisent, <code>arrow</code> fixe par défaut la valeur à 32768 et <code>duckdb</code> à 122880.</p>
+<p>Pour plus d’information sur la <a href="https://cloudsqale.com/2020/05/29/how-parquet-files-are-written-row-groups-pages-required-memory-and-flush-operations/">notion de “row group”</a>.</p>
+</section>
+<section id="fermer-votre-base-de-données" class="level3">
+<h3 class="anchored" data-anchor-id="fermer-votre-base-de-données">Fermer votre base de données</h3>
+<p>Pensez à fermer votre base de données avec la commande :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb92"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb92-1"><a href="#cb92-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dbDisconnect</span>(con, <span class="at">shutdown =</span> <span class="cn">TRUE</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>ça vous évitera des messages d’avertissement comme :</p>
+<pre><code>Warning messages:
+1: Database is garbage-collected, use dbDisconnect(con, shutdown=TRUE) or duckdb::duckdb_shutdown(drv) to avoid this. 
+2: Connection is garbage-collected, use dbDisconnect() to avoid this. </code></pre>
+</section>
+</section>
+<section id="quelques-derniers-compléments-sur-duckdb" class="level2">
+<h2 class="anchored" data-anchor-id="quelques-derniers-compléments-sur-duckdb">Quelques derniers compléments sur <code>duckdb</code></h2>
+<p>Au delà du CSV et de parquet, <code>duckdb</code> sait lire le format json, sait gérer les données imbriquées et les structures complexes.</p>
+<p>Des extensions sont <a href="https://duckdb.org/docs/extensions/overview.html">disponibles</a> pour traiter des données SIG, interroger une base de données postgres/mysql/sqlite ou encore interroger des fichiers parquet à travers internet.</p>
+<p>Et <code>duckdb</code> est encore jeune, chaque version apporte son lot d’évolution. La 0.9.0 a nettement amélioré la gestion de la mémoire.</p>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>Que ça soit avec <code>dplyr</code> ou nativement, comme <code>arrow</code>, <code>duckdb</code> rend rapide des calculs qui étaient lents et possible des calculs qui ne l’étaient pas.</p>
+<p>Contrairement à <code>arrow</code>, il est capable de faire des jointures entre des tables de plusieurs dizaines voire centaines de millions de lignes et de donner les résultats en quelques secondes ou minutes.</p>
+<p>Le format de données interne est très performant (encore plus rapide que parquet) mais n’est pas encore stabilisé, il est donc déconseillé de l’utiliser pour des données pérennes.</p>
+<section id="duckdb-pour-quoi-faire" class="level3">
+<h3 class="anchored" data-anchor-id="duckdb-pour-quoi-faire"><code>duckdb</code> pour quoi faire ?</h3>
+<p><code>duckdb</code> peut intervenir à plusieurs phases de vos travaux :</p>
+<ul>
+<li>pour nettoyer vos données</li>
+<li>pour regarder ce qu’il y a dedans</li>
+<li>pour faire vos études</li>
+<li>pour faire des chaines de production</li>
+</ul>
+<p>Si vous avez du CSV mal formé ou dans un encodage différent de UTF8, vous devrez peut-être passer par d’autres outils pour le rendre lisible.</p>
+<p><code>duckdb</code> n’est pas adapté :</p>
+<ul>
+<li>si vous ne souhaitez pas traiter de la donnée (au sens stat du terme)</li>
+<li>si vous voulez faire des transactions</li>
+<li>si vos données sont mises à jour en temps réel</li>
+</ul>
+</section>
+<section id="comment-choisir-entre-arrow-et-duckdb" class="level3">
+<h3 class="anchored" data-anchor-id="comment-choisir-entre-arrow-et-duckdb">Comment choisir entre <code>arrow</code> et <code>duckdb</code></h3>
+<p>Si vous avez à choisir entre <code>arrow</code> et <code>duckdb</code> :</p>
+<ol type="1">
+<li>si vous manipulez un fichier unique : <code>arrow</code> et/ou <code>duckdb</code></li>
+<li><code>arrow</code> n’implémente pas les fonctions dont vous avez besoin : <code>to_duckdb()</code></li>
+<li>vous avez des jointures conséquentes : <code>duckdb</code> (associé à <code>dbplyr</code> ou pas)</li>
+<li>vous aimez SQL : <code>duckdb</code></li>
+</ol>
+<p>Si je devais donner mon avis personnel (que personne ne demande), je trouve <code>duckdb</code> plus puissant, plus complet et plus souple que <code>arrow</code> et j’en arrive (presque) à apprécier SQL. Le fait de pouvoir utiliser toutes les fonctions de <code>duckdb</code> à travers <code>dplyr</code> donne accès à une boite à outil très intéressante.</p>
+</section>
+<section id="convertir-un-traitement-vers-duckdb-et-dbplyr-ou-pas" class="level3">
+<h3 class="anchored" data-anchor-id="convertir-un-traitement-vers-duckdb-et-dbplyr-ou-pas">Convertir un traitement vers <code>duckdb</code> et <code>dbplyr</code> (ou pas)</h3>
+<p>Je reprends les mêmes conseils que dans la session <code>arrow</code>, quand vous convertissez un traitement de {dplyr}, faites des tests :</p>
+<ul>
+<li>sur quelques lignes et comparer les deux sorties.</li>
+<li>sur les agrégats entre les deux méthodes (la fonction <a href="https://duckdb.org/docs/guides/meta/summarize.html">SUMMARIZE</a> peut vous aider)</li>
+<li>sur le fonctionnement de vos expressions rationnelles</li>
+<li>sur la conversion des dates par <code>lubridate</code> (calcul de max sur les dates, que donne un NA…)</li>
+<li>…</li>
+</ul>
+</section>
+</section>
+<section id="quelques-références" class="level2">
+<h2 class="anchored" data-anchor-id="quelques-références">Quelques références</h2>
+<ul>
+<li>la <a href="https://duckdb.org/docs/api/r.html">documentation de l’API R de duckdb</a></li>
+<li>la <a href="https://dbplyr.tidyverse.org/">documentation de <code>dbplyr</code></a></li>
+<li>la <a href="https://duckdb.org/docs/sql/introduction">documentation du SQL de duckdb</a></li>
+<li><a href="https://www.christophenicault.com/fr/post/large_dataframe_arrow_duckdb/">Manipuler des données volumineuses avec Arrow &amp; DuckDB</a></li>
+<li>les pages sur <a href="https://www.book.utilitr.org/03_fiches_thematiques/fiche_import_fichiers_parquet">parquet</a> et sur <a href="https://www.book.utilitr.org/03_fiches_thematiques/fiche_connexion_bdd">l’accès aux bases de données</a> d’utilitR</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copié");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copié");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

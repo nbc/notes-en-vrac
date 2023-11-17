@@ -14,15 +14,15 @@ website:
         text: "Les outils big data de R"
       - section: "Quelques documents en vracs"
         contents:
-          - href: articles/introduction-donnees-massives-arrow.qmd
+          - href: introduction-donnees-massives-arrow.qmd
             text: "Introduction à arrow"
-          - href: articles/introduction-duckdb.qmd
+          - href: introduction-duckdb.qmd
             text: "Introduction à duckdb"
-          - href: articles/cas-pratique-traitement-duckdb.qmd
+          - href: cas-pratique-traitement-duckdb.qmd
             text: "Un exemple de conversion a duckdb"
-          - href: articles/conversion-fichier-sas.qmd
+          - href: conversion-fichier-sas.qmd
             text: "Notes sur la conversion de fichiers SAS"
       - section: "Présentations"
         contents:
-          - href: articles/presentation_insee.qmd
+          - href: presentation_insee.qmd
             text: "REX SDES - Présentation INSEE"

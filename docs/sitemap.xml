@@ -1,7 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
+    <loc>https://nbc.gitlab-pages.din.developpement-durable.gouv.fr/big-data/docs/introduction-duckdb.html</loc>
+    <lastmod>2023-11-17T14:51:35.557Z</lastmod>
+  </url>
+  <url>
+    <loc>https://nbc.gitlab-pages.din.developpement-durable.gouv.fr/big-data/docs/cas-pratique-traitement-duckdb.html</loc>
+    <lastmod>2023-11-17T14:51:37.141Z</lastmod>
+  </url>
+  <url>
+    <loc>https://nbc.gitlab-pages.din.developpement-durable.gouv.fr/big-data/docs/presentation_insee.html</loc>
+    <lastmod>2023-11-17T14:51:39.869Z</lastmod>
+  </url>
+  <url>
+    <loc>https://nbc.gitlab-pages.din.developpement-durable.gouv.fr/big-data/docs/introduction-donnees-massives-arrow.html</loc>
+    <lastmod>2023-11-17T14:51:41.777Z</lastmod>
+  </url>
+  <url>
     <loc>https://nbc.gitlab-pages.din.developpement-durable.gouv.fr/big-data/docs/index.html</loc>
-    <lastmod>2023-11-17T14:36:50.401Z</lastmod>
+    <lastmod>2023-11-17T14:51:41.909Z</lastmod>
+  </url>
+  <url>
+    <loc>https://nbc.gitlab-pages.din.developpement-durable.gouv.fr/big-data/docs/conversion-fichier-sas.html</loc>
+    <lastmod>2023-11-17T14:51:42.545Z</lastmod>
   </url>
 </urlset>

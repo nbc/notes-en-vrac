@@ -9,4 +9,5 @@ data/
 
 /.quarto/
 *.db
+*.db.wal
 *.parquet

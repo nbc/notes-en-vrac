@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.335">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>big data &amp; R - Traiter des données massives en R avec arrow</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "Pas de résultats",
+    "search-matching-documents-text": "documents trouvés",
+    "search-copy-link-title": "Copier le lien vers la recherche",
+    "search-hide-matches-text": "Cacher les correspondances additionnelles",
+    "search-more-match-text": "correspondance de plus dans ce document",
+    "search-more-matches-text": "correspondances de plus dans ce document",
+    "search-clear-button-title": "Effacer",
+    "search-detached-cancel-button-title": "Annuler",
+    "search-submit-button-title": "Envoyer"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar docked">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+    <div class="container-fluid d-flex justify-content-between">
+      <h1 class="quarto-secondary-nav-title">Traiter des données massives en R avec <code>arrow</code></h1>
+      <button type="button" class="quarto-btn-toggle btn" aria-label="Show secondary navigation">
+        <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">big data &amp; R</a> 
+    </div>
+      </div>
+      <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+      </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">Les outils big data de R</a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="true">Quelques documents en vracs</a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="true">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./introduction-donnees-massives-arrow.html" class="sidebar-item-text sidebar-link active">Introduction à arrow</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./introduction-duckdb.html" class="sidebar-item-text sidebar-link">Introduction à duckdb</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./cas-pratique-traitement-duckdb.html" class="sidebar-item-text sidebar-link">Un exemple de conversion a duckdb</a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./conversion-fichier-sas.html" class="sidebar-item-text sidebar-link">Notes sur la conversion de fichiers SAS</a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true">Présentations</a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./presentation_insee.html" class="sidebar-item-text sidebar-link">REX SDES - Présentation INSEE</a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Sur cette page</h2>
+   
+  <ul>
+  <li><a href="#quelques-packages-utilisés" id="toc-quelques-packages-utilisés" class="nav-link active" data-scroll-target="#quelques-packages-utilisés">Quelques packages utilisés</a></li>
+  <li><a href="#travail-sur-une-table-unique" id="toc-travail-sur-une-table-unique" class="nav-link" data-scroll-target="#travail-sur-une-table-unique">Travail sur une table unique</a>
+  <ul class="collapse">
+  <li><a href="#exemple-1-interagir-avec-les-données" id="toc-exemple-1-interagir-avec-les-données" class="nav-link" data-scroll-target="#exemple-1-interagir-avec-les-données">Exemple 1 : interagir avec les données</a></li>
+  <li><a href="#exemple-2-une-requête-simple" id="toc-exemple-2-une-requête-simple" class="nav-link" data-scroll-target="#exemple-2-une-requête-simple">Exemple 2 : une requête simple</a></li>
+  <li><a href="#exemple-3-limitations" id="toc-exemple-3-limitations" class="nav-link" data-scroll-target="#exemple-3-limitations">Exemple 3 : Limitations</a></li>
+  <li><a href="#quelques-détails-pertinents-sur-le-format-parquet" id="toc-quelques-détails-pertinents-sur-le-format-parquet" class="nav-link" data-scroll-target="#quelques-détails-pertinents-sur-le-format-parquet">Quelques détails pertinents sur le format parquet</a></li>
+  <li><a href="#lire-des-données-non-parquet" id="toc-lire-des-données-non-parquet" class="nav-link" data-scroll-target="#lire-des-données-non-parquet">lire des données “non parquet”</a></li>
+  <li><a href="#exemple-4-au-delà-de-dplyr" id="toc-exemple-4-au-delà-de-dplyr" class="nav-link" data-scroll-target="#exemple-4-au-delà-de-dplyr">Exemple 4 : au delà de dplyr</a></li>
+  </ul></li>
+  <li><a href="#et-les-jointures-dans-tout-ça" id="toc-et-les-jointures-dans-tout-ça" class="nav-link" data-scroll-target="#et-les-jointures-dans-tout-ça">Et les jointures dans tout ça ?</a>
+  <ul class="collapse">
+  <li><a href="#exemple-attention-aux-pièges" id="toc-exemple-attention-aux-pièges" class="nav-link" data-scroll-target="#exemple-attention-aux-pièges">Exemple : attention aux pièges</a></li>
+  </ul></li>
+  <li><a href="#quand-arrow-ne-sait-pas-faire-le-job" id="toc-quand-arrow-ne-sait-pas-faire-le-job" class="nav-link" data-scroll-target="#quand-arrow-ne-sait-pas-faire-le-job">Quand <code>arrow</code> ne sait pas faire le job</a></li>
+  <li><a href="#quelques-conclusions-temporaires" id="toc-quelques-conclusions-temporaires" class="nav-link" data-scroll-target="#quelques-conclusions-temporaires">Quelques conclusions temporaires</a>
+  <ul class="collapse">
+  <li><a href="#limitations-de-arrow" id="toc-limitations-de-arrow" class="nav-link" data-scroll-target="#limitations-de-arrow">Limitations de <code>arrow</code></a></li>
+  <li><a href="#jointures-entre-des-grosses-tables" id="toc-jointures-entre-des-grosses-tables" class="nav-link" data-scroll-target="#jointures-entre-des-grosses-tables">jointures entre des grosses tables</a></li>
+  <li><a href="#arrow-na-pas-forcément-le-même-comportement-que-dplyr" id="toc-arrow-na-pas-forcément-le-même-comportement-que-dplyr" class="nav-link" data-scroll-target="#arrow-na-pas-forcément-le-même-comportement-que-dplyr"><code>arrow</code> n’a pas forcément le même comportement que <code>dplyr</code></a></li>
+  <li><a href="#une-librairie-encore-jeune" id="toc-une-librairie-encore-jeune" class="nav-link" data-scroll-target="#une-librairie-encore-jeune">une librairie encore jeune</a></li>
+  </ul></li>
+  <li><a href="#pour-approfondir-arrow" id="toc-pour-approfondir-arrow" class="nav-link" data-scroll-target="#pour-approfondir-arrow">Pour approfondir <code>arrow</code></a></li>
+  <li><a href="#la-suite" id="toc-la-suite" class="nav-link" data-scroll-target="#la-suite">La suite</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title d-none d-lg-block">Traiter des données massives en R avec <code>arrow</code></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<div class="callout-warning callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Avertissement
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Chapitre en construction</p>
+</div>
+</div>
+<p>L’objectif de ce document est de voir comment traiter des données massives avec :</p>
+<ul>
+<li>le format parquet</li>
+<li>la librairie <code>arrow</code></li>
+<li>un petit bout de la base de données embarquée <code>duckdb</code></li>
+</ul>
+<p>Ces outils ne sont pas magiques, ils permettent :</p>
+<ul>
+<li>de faire des traitements impossible avant avec R</li>
+<li>d’accélérer des traitements existants (SAS ou R)</li>
+</ul>
+<p>Mais ils ont leurs limites aussi.</p>
+<p><br></p>
+<p>Par ailleurs, le présentateur a beaucoup expérimenté depuis quelques semaines mais n’est pas data-scientiste et a certainement loupé des choses.</p>
+<section id="quelques-packages-utilisés" class="level2">
+<h2 class="anchored" data-anchor-id="quelques-packages-utilisés">Quelques packages utilisés</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(arrow)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tictoc)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(fs)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="travail-sur-une-table-unique" class="level2">
+<h2 class="anchored" data-anchor-id="travail-sur-une-table-unique">Travail sur une table unique</h2>
+<p>Dans la suite de cette documentation, nous allons utiliser les données des courses de taxi new-yorkais diffusées par la ville de New York qui sont déjà disponibles sur le partage accessible depuis les serveurs R. Ce jeux de données fait 64Go et contient un peu plus d’1 milliard 600 millions de lignes.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>taxi_dir <span class="ot">&lt;-</span> <span class="st">"/nfs/partage-r-sas/exemples/taxis-data/nyc-taxi"</span></span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/unnamed-chunk-2_fd63c82f6272521af0fa6384c6598a88">
+
+</div>
+<p>Pour accéder aux données, nous allons utiliser <code>arrow::open_dataset()</code> :</p>
+<div class="cell" data-output.lines="10">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>nyc_taxi <span class="ot">&lt;-</span> arrow<span class="sc">::</span><span class="fu">open_dataset</span>(taxi_dir)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>nyc_taxi</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FileSystemDataset with 158 Parquet files
+vendor_name: string
+pickup_datetime: timestamp[ms]
+dropoff_datetime: timestamp[ms]
+passenger_count: int64
+trip_distance: double
+pickup_longitude: double
+pickup_latitude: double
+rate_code: string
+store_and_fwd: string
+...</code></pre>
+</div>
+</div>
+<p>Cette fonction ne retourne pas le dataframe habituel mais un certain nombre d’informations comme le nombre de fichiers et le nom des champs.</p>
+<p>D’après les informations, les données sont réparties dans 158 fichiers différents :</p>
+<div class="cell" data-output.lines="10">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>fs<span class="sc">::</span><span class="fu">dir_tree</span>(taxi_dir)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>/home/nc/travail/R/Rexploration/rdata/nyc-taxi/
+├── year=2009
+│   ├── month=1
+│   │   └── part-0.parquet
+│   ├── month=10
+│   │   └── part-0.parquet
+│   ├── month=11
+│   │   └── part-0.parquet
+│   ├── month=12
+│   │   └── part-0.parquet
+...</code></pre>
+</div>
+</div>
+<p>Les fichiers sont répartis dans des sous-répertoires par années et par mois, nous verrons plus tard l’intérêt de cette organisation.</p>
+<section id="exemple-1-interagir-avec-les-données" class="level3">
+<h3 class="anchored" data-anchor-id="exemple-1-interagir-avec-les-données">Exemple 1 : interagir avec les données</h3>
+<p>Regardons les premières lignes des données avec la fonction <code>head()</code> :</p>
+<div class="cell" data-output.lines="5" data-hash="introduction-donnees-massives-arrow_cache/html/head_7506e92425579d6ac1fa6d972a964552">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>nyc_taxi <span class="sc">%&gt;%</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Table
+6 rows x 24 columns
+$vendor_name &lt;string&gt;
+$pickup_datetime &lt;timestamp[ms]&gt;
+$dropoff_datetime &lt;timestamp[ms]&gt;
+...</code></pre>
+</div>
+</div>
+<p>Comme pour <code>open_dataset()</code>, <code>head()</code> ne retourne pas les données elles-mêmes mais uniquement la liste des champs. Avec <code>arrow</code>, aucune opération n’est réalisée à l’ouverture d’un fichier, pour déclencher les calculs, vous devez utiliser la fonction <code>collect()</code> :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/head_and_collect_702c644dfcfd2f8ef31652713ba91a6b">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>nyc_taxi <span class="sc">%&gt;%</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 24
+  vendor_name pickup_datetime     dropoff_datetime    passenger_count
+  &lt;chr&gt;       &lt;dttm&gt;              &lt;dttm&gt;                        &lt;int&gt;
+1 VTS         2009-01-04 03:52:00 2009-01-04 04:02:00               1
+2 VTS         2009-01-04 04:31:00 2009-01-04 04:38:00               3
+3 VTS         2009-01-03 16:43:00 2009-01-03 16:57:00               5
+4 DDS         2009-01-01 21:52:58 2009-01-01 22:14:00               1
+5 DDS         2009-01-24 17:18:23 2009-01-24 17:24:56               1
+6 DDS         2009-01-16 23:35:59 2009-01-16 23:43:35               2
+# ℹ 20 more variables: trip_distance &lt;dbl&gt;, pickup_longitude &lt;dbl&gt;,
+#   pickup_latitude &lt;dbl&gt;, rate_code &lt;chr&gt;, store_and_fwd &lt;chr&gt;,
+#   dropoff_longitude &lt;dbl&gt;, dropoff_latitude &lt;dbl&gt;, payment_type &lt;chr&gt;,
+#   fare_amount &lt;dbl&gt;, extra &lt;dbl&gt;, mta_tax &lt;dbl&gt;, tip_amount &lt;dbl&gt;,
+#   tolls_amount &lt;dbl&gt;, total_amount &lt;dbl&gt;, improvement_surcharge &lt;dbl&gt;,
+#   congestion_surcharge &lt;dbl&gt;, pickup_location_id &lt;int&gt;,
+#   dropoff_location_id &lt;int&gt;, year &lt;int&gt;, month &lt;int&gt;</code></pre>
+</div>
+</div>
+<p>Cette façon de faire permet à la librairie <code>arrow</code> d’avoir une vision globale des calculs qu’elle va devoir réaliser et d’optimiser les opérations dans leur ensemble.</p>
+</section>
+<section id="exemple-2-une-requête-simple" class="level3">
+<h3 class="anchored" data-anchor-id="exemple-2-une-requête-simple">Exemple 2 : une requête simple</h3>
+<p>Nous voulons calculer sur 2017, 2019 et 2021 le nombre de trajets, de trajets partagés et le pourcentage de trajets sur trajets partagés.</p>
+<p>Nous allons utilisez les verbes <code>dplyr</code> classiques :</p>
+<ol type="1">
+<li>filter() pour filtrer sur la période</li>
+<li>group_by() pour groupper sur l’année</li>
+<li>summarize() pour compter le nombre de trajet et de trajets partagés</li>
+<li>mutate() pour calculer le pourcentage</li>
+<li>collect() pour déclencher l’exécution et retourner le résultat dans R</li>
+</ol>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>shared_rides <span class="ot">&lt;-</span> nyc_taxi <span class="sc">|&gt;</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">2017</span>, <span class="dv">2019</span>, <span class="dv">2021</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">|&gt;</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">all_trips =</span> <span class="fu">n</span>(),</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">shared_trips =</span> <span class="fu">sum</span>(passenger_count <span class="sc">&gt;</span> <span class="dv">1</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">pct_shared =</span> shared_trips <span class="sc">/</span> all_trips <span class="sc">*</span> <span class="dv">100</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/requete_simple_2_c726c730f6f40b4156057e8d6f68a544">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>shared_rides <span class="sc">%&gt;%</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 4
+   year all_trips shared_trips pct_shared
+  &lt;int&gt;     &lt;int&gt;        &lt;int&gt;      &lt;dbl&gt;
+1  2017 113495512     32296166       28.5
+2  2019  84393604     23515989       27.9
+3  2021  30902618      7221844       23.4</code></pre>
+</div>
+</div>
+<p>Il faut noter que, comme précédemment, aucun calcul n’est réalisé en R. <code>arrow</code> va convertir tous ces ordres et les exécuter en interne ce qui implique des limitations qu’il faut comprendre.</p>
+</section>
+<section id="exemple-3-limitations" class="level3">
+<h3 class="anchored" data-anchor-id="exemple-3-limitations">Exemple 3 : Limitations</h3>
+<p>L’affichage est illisible, nous souhaitons afficher le résultat par millions de courses.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>millions <span class="ot">&lt;-</span> <span class="cf">function</span>(x) x <span class="sc">/</span> <span class="dv">10</span><span class="sc">^</span><span class="dv">6</span></span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Nous pouvons utiliser mutate sur chaque variable concernée :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/limit_2_89e4ebe3a2f656a10d44857a9520f7ef">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>shared_rides <span class="sc">|&gt;</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">all_trips =</span> <span class="fu">millions</span>(all_trips),</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">shared_trips =</span> <span class="fu">millions</span>(shared_trips)</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 4
+   year all_trips shared_trips pct_shared
+  &lt;int&gt;     &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt;
+1  2017     113.         32.3        28.5
+2  2019      84.4        23.5        27.9
+3  2021      30.9         7.22       23.4</code></pre>
+</div>
+</div>
+<p>Nous pouvons aussi essayer d’utiliser <code>mutate_at</code> :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/limit_3_82a8ca4570eef3d813cddb68a5cb18df">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>shared_rides <span class="sc">|&gt;</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate_at</span>(<span class="fu">c</span>(<span class="st">"all_trips"</span>, <span class="st">"shared_trips"</span>), millions) <span class="sc">|&gt;</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-error">
+<pre><code>Error in `map_lgl()`:
+ℹ In index: 1.
+Caused by error in `if (deparse(expr[[1]]) == name) ...`:
+! the condition has length &gt; 1</code></pre>
+</div>
+</div>
+<p>Mais certains verbes ne sont pas (encore ?) implémentés dans <code>arrow</code>. Une façon de faire est alors de réaliser le calcul lourd dans <code>arrow</code> et, une fois que le volume de données est suffisament réduit d’appliquer la méthode mutate_at :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/limit_4_6a119bc5016ada68e011c9495f9dbf07">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>shared_rides <span class="sc">|&gt;</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate_at</span>(<span class="fu">c</span>(<span class="st">"all_trips"</span>, <span class="st">"shared_trips"</span>), millions)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 4
+   year all_trips shared_trips pct_shared
+  &lt;int&gt;     &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt;
+1  2017     113.         32.3        28.5
+2  2019      84.4        23.5        27.9
+3  2021      30.9         7.22       23.4</code></pre>
+</div>
+</div>
+<p>La liste complète des verbes implémentés est disponible dans la <a href="https://arrow.apache.org/docs/dev/r/reference/acero.html">documentation de arrow</a>.</p>
+<p>Nous voyons que si <code>mutate_at()</code> n’est pas implémenté, <code>mutate()</code> et <code>across()</code> le sont, nous pourrions donc aussi écrire :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/limit_5_bed203eadbeee08542a73b7240e9c338">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>shared_rides <span class="sc">|&gt;</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">ends_with</span>(<span class="st">"trips"</span>), millions)) <span class="sc">|&gt;</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 4
+   year all_trips shared_trips pct_shared
+  &lt;int&gt;     &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt;
+1  2017     113.         32.3        28.5
+2  2019      84.4        23.5        27.9
+3  2021      30.9         7.22       23.4</code></pre>
+</div>
+</div>
+</section>
+<section id="quelques-détails-pertinents-sur-le-format-parquet" class="level3">
+<h3 class="anchored" data-anchor-id="quelques-détails-pertinents-sur-le-format-parquet">Quelques détails pertinents sur le format parquet</h3>
+<p>Avant d’aller plus loin, revenons sur l’organisation des fichiers parquet. Pour cela, testons les performances de 3 requêtes avec des différents niveaux de filtres :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/interet_2_43691763917fe2ba73c042d06fea691f">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">%&gt;%</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">n =</span> <span class="fu">n</span>(), <span class="at">mean =</span> <span class="fu">mean</span>(trip_distance)) <span class="sc">%&gt;%</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">%&gt;%</span> <span class="fu">invisible</span>()</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>17.053 sec elapsed</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">%&gt;%</span> </span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(trip_distance <span class="sc">&gt;</span> <span class="dv">200</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">n =</span> <span class="fu">n</span>(), <span class="at">mean =</span> <span class="fu">mean</span>(trip_distance)) <span class="sc">%&gt;%</span> </span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">%&gt;%</span> <span class="fu">invisible</span>()</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>4.274 sec elapsed</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>, month <span class="sc">==</span> <span class="dv">3</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">n =</span> <span class="fu">n</span>(), <span class="at">mean =</span> <span class="fu">mean</span>(trip_distance)) <span class="sc">%&gt;%</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">%&gt;%</span> <span class="fu">invisible</span>()</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>2.235 sec elapsed</code></pre>
+</div>
+</div>
+<p>Pour comprendre ces différences de performance il faut se rappeler que :</p>
+<p>les données parquet sont organisées dans plusieurs fichiers :</p>
+<div class="cell" data-output.lines="10">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>fs<span class="sc">::</span><span class="fu">dir_tree</span>(taxi_dir)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>/home/nc/travail/R/Rexploration/rdata/nyc-taxi/
+├── year=2009
+│   ├── month=1
+│   │   └── part-0.parquet
+│   ├── month=10
+│   │   └── part-0.parquet
+│   ├── month=11
+│   │   └── part-0.parquet
+│   ├── month=12
+│   │   └── part-0.parquet
+...</code></pre>
+</div>
+</div>
+<p>Et savoir que le format parquet est organisé en colonne et non en ligne comme CSV :</p>
+<p><img src="img/parquet-chunking.svg" class="img-fluid"></p>
+<p>et enfin que chaque fichier intègre des méta-données comme les minimums et maximums pour chaque colonne numérique.</p>
+<p>Pour les trois requêtes précédentes :</p>
+<ol type="1">
+<li><p>Dans le premier cas, <code>arrow</code> lit tous les fichiers mais uniquement la colonne <code>trip_distance</code>.</p></li>
+<li><p>Dans le deuxième cas, <code>arrow</code> lit</p>
+<ol type="1">
+<li><p>les métadonnées des fichiers et sélectionne ceux où le minimum de trip_distance est supérieur à 200</p></li>
+<li><p>la colonne trip_distance uniquement dans ces fichiers</p></li>
+</ol></li>
+<li><p>Dans le dernier cas <code>arrow</code> lit uniquement la colonne trip_distance des fichiers du répertoire <code>year=2016/month=1/</code></p></li>
+</ol>
+<div class="callout-tip callout callout-style-default callout-captioned">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-caption-container flex-fill">
+Astuce
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>parquet permet facilement de lire uniquement certaines colonnes</li>
+<li>les métadonnées apportent un gain direct, sans action de votre part</li>
+<li>si vos données sont volumineuses, il est fortement recommandé de partitionner</li>
+<li>il y a dans tous les cas peu de perte à partitionner, au pire ça ne sert à rien.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="lire-des-données-non-parquet" class="level3">
+<h3 class="anchored" data-anchor-id="lire-des-données-non-parquet">lire des données “non parquet”</h3>
+<p><code>arrow</code> permet évidemment de manipuler des données “non parquet”.</p>
+<p>Pour un fichier CSV, on peut aussi utiliser la fonction <code>arrow::read_csv_arrow()</code> avec l’argument <code>as_data_frame</code> à <code>FALSE</code> :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/lire_csv_b694796007729e0593c0d1e5064ca21b">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="fu">read_csv_arrow</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"../taxi+_zone_lookup.csv"</span>),</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>               <span class="at">as_data_frame =</span> <span class="cn">FALSE</span>)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Table
+265 rows x 4 columns
+$LocationID &lt;int64&gt;
+$Borough &lt;string&gt;
+$Zone &lt;string&gt;
+$service_zone &lt;string&gt;</code></pre>
+</div>
+</div>
+<p>La première solution permet de convertir n’importe quel data.frame/tibble :</p>
+<ol type="1">
+<li>charger les données dans un data.frame</li>
+<li>convertir le data.frame au format <code>arrow</code></li>
+</ol>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/lire_non_parquet_6b1b01325725884717a255c43bc36f48">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"../taxi+_zone_lookup.csv"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_arrow_table</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Rows: 265 Columns: 4
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (3): Borough, Zone, service_zone
+dbl (1): LocationID
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Table
+265 rows x 4 columns
+$LocationID &lt;double&gt;
+$Borough &lt;string&gt;
+$Zone &lt;string&gt;
+$service_zone &lt;string&gt;
+
+See $metadata for additional Schema metadata</code></pre>
+</div>
+</div>
+</section>
+<section id="exemple-4-au-delà-de-dplyr" class="level3">
+<h3 class="anchored" data-anchor-id="exemple-4-au-delà-de-dplyr">Exemple 4 : au delà de dplyr</h3>
+<p><code>arrow</code> implémente également des verbes de <code>lubridate</code> et <code>stringr</code>.</p>
+<p>Nous pouvons par exemple calculer la moyenne du nombre de passagers par jour de la semaine et par année :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/lubridate_8bc3c8c479c46aeb6ec81f90996e3e32">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">%&gt;%</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">weekday =</span> <span class="fu">wday</span>(pickup_datetime, <span class="at">label =</span> <span class="cn">FALSE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year, weekday) <span class="sc">%&gt;%</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">moyenne_pass =</span> <span class="fu">mean</span>(passenger_count, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(year, weekday) <span class="sc">%&gt;%</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> weekday, <span class="at">values_from =</span> moyenne_pass)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 14 × 8
+# Groups:   year [14]
+    year   `1`   `2`   `3`   `4`   `5`   `6`   `7`
+   &lt;int&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;
+ 1  2009  1.79  1.63  1.64  1.63  1.65  1.69  1.81
+ 2  2010  1.75  1.63  1.62  1.63  1.64  1.68  1.78
+ 3  2011  1.72  1.61  1.60  1.60  1.62  1.65  1.75
+ 4  2012  1.75  1.65  1.65  1.65  1.66  1.69  1.78
+ 5  2013  1.77  1.67  1.68  1.68  1.68  1.71  1.78
+ 6  2014  1.74  1.67  1.66  1.67  1.67  1.69  1.76
+ 7  2015  1.73  1.66  1.65  1.65  1.66  1.68  1.74
+ 8  2016  1.71  1.63  1.63  1.63  1.63  1.65  1.72
+ 9  2017  1.67  1.61  1.60  1.60  1.60  1.62  1.68
+10  2018  1.64  1.58  1.57  1.57  1.57  1.59  1.66
+11  2019  1.62  1.54  1.53  1.53  1.53  1.56  1.64
+12  2020  1.52  1.44  1.44  1.44  1.44  1.46  1.54
+13  2021  1.48  1.41  1.39  1.40  1.40  1.43  1.50
+14  2022  1.46  1.37  1.35  1.35  1.35  1.39  1.47</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="et-les-jointures-dans-tout-ça" class="level2">
+<h2 class="anchored" data-anchor-id="et-les-jointures-dans-tout-ça">Et les jointures dans tout ça ?</h2>
+<p>Les courses de taxi intègre une colonne pickup_location_id et dropoff_location_id et le fichier <code>taxi+_zone_lookup.csv</code> donne la correspondance entre cet identifiant et le nom.</p>
+<section id="exemple-attention-aux-pièges" class="level3">
+<h3 class="anchored" data-anchor-id="exemple-attention-aux-pièges">Exemple : attention aux pièges</h3>
+<p>Chargeons le fichier en faisant un peu de nettoyage sur les noms de variables :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/lit_csv_2_68124311e5a73351049d93171ceeea59">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>taxi_zones <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"../taxi+_zone_lookup.csv"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_location_id =</span> LocationID,</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">borough =</span> Borough</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Rows: 265 Columns: 4
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (3): Borough, Zone, service_zone
+dbl (1): LocationID
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>taxi_zones</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 265 × 2
+   pickup_location_id borough      
+                &lt;dbl&gt; &lt;chr&gt;        
+ 1                  1 EWR          
+ 2                  2 Queens       
+ 3                  3 Bronx        
+ 4                  4 Manhattan    
+ 5                  5 Staten Island
+ 6                  6 Staten Island
+ 7                  7 Queens       
+ 8                  8 Queens       
+ 9                  9 Queens       
+10                 10 Queens       
+# ℹ 255 more rows</code></pre>
+</div>
+</div>
+<p>Essayons de faire la jointure sur la colonne pickup_location_id :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/piege_1_80e063c3aeb554ce53a220131dfb59ad">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="fu">open_dataset</span>(taxi_dir) <span class="sc">%&gt;%</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(taxi_zones) <span class="sc">|&gt;</span></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-error">
+<pre><code>Error in `compute.arrow_dplyr_query()`:
+! Invalid: Incompatible data types for corresponding join field keys: FieldRef.Name(pickup_location_id) of type int64 and FieldRef.Name(pickup_location_id) of type double</code></pre>
+</div>
+</div>
+<p><code>arrow</code> est pointilleux sur les types de données et en l’occurence, pickup_location_id est de type int64 dans la les courses et de type double dans la table des zones.</p>
+<p>Pour contourner ce piège, nous allons devoir passer un schéma pour forcer le type de <code>LocationID</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>taxi_zones <span class="ot">&lt;-</span> readr<span class="sc">::</span><span class="fu">read_csv</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"../taxi+_zone_lookup.csv"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">location_id =</span> LocationID,</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">borough =</span> Borough</span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_arrow_table</span>(</span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">schema =</span> <span class="fu">schema</span>(</span>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">location_id =</span> <span class="fu">int64</span>(),</span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>      <span class="at">borough =</span> <span class="fu">utf8</span>()</span>
+<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb44-11"><a href="#cb44-11" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Rows: 265 Columns: 4
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (3): Borough, Zone, service_zone
+dbl (1): LocationID
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+</div>
+</div>
+<p>A partir de cet objet <code>arrow</code>, nous allons créer deux objets dédiés à la jointure sur la zone de prise en charge et de dépose :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>pickup <span class="ot">&lt;-</span> taxi_zones <span class="sc">|&gt;</span></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_location_id =</span> location_id,</span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">pickup_borough =</span> borough</span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a>dropoff <span class="ot">&lt;-</span> taxi_zones <span class="sc">|&gt;</span></span>
+<span id="cb46-8"><a href="#cb46-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb46-9"><a href="#cb46-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">dropoff_location_id =</span> location_id,</span>
+<span id="cb46-10"><a href="#cb46-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">dropoff_borough =</span> borough</span>
+<span id="cb46-11"><a href="#cb46-11" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Et on peut maintenant utiliser ces objets directement :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/borough_fe6ba2c44dd9472b8a2e65fbce7b8606">
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>borough_counts <span class="ot">&lt;-</span> nyc_taxi <span class="sc">|&gt;</span></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2016</span>) <span class="sc">|&gt;</span></span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(pickup) <span class="sc">|&gt;</span></span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(dropoff) <span class="sc">|&gt;</span></span>
+<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(pickup_borough, dropoff_borough) <span class="sc">|&gt;</span></span>
+<span id="cb47-7"><a href="#cb47-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(n)) <span class="sc">|&gt;</span></span>
+<span id="cb47-8"><a href="#cb47-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
+<span id="cb47-9"><a href="#cb47-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-10"><a href="#cb47-10" aria-hidden="true" tabindex="-1"></a>borough_counts</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 50 × 3
+   pickup_borough dropoff_borough        n
+   &lt;chr&gt;          &lt;chr&gt;              &lt;int&gt;
+ 1 &lt;NA&gt;           &lt;NA&gt;            69406520
+ 2 Manhattan      Manhattan       51485239
+ 3 Manhattan      Queens           2144638
+ 4 Queens         Manhattan        2045826
+ 5 Manhattan      Brooklyn         1922556
+ 6 Queens         Queens           1013587
+ 7 Unknown        Unknown           769849
+ 8 Brooklyn       Brooklyn          648109
+ 9 Queens         Brooklyn          503246
+10 Manhattan      Bronx             289341
+# ℹ 40 more rows</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>12.123 sec elapsed</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="quand-arrow-ne-sait-pas-faire-le-job" class="level2">
+<h2 class="anchored" data-anchor-id="quand-arrow-ne-sait-pas-faire-le-job">Quand <code>arrow</code> ne sait pas faire le job</h2>
+<p>Nous avons vu que <code>arrow</code> n’avait pas une couverture complète des verbes de <code>dplyr</code>. Certaines fonctions sont implémentées de façon “partielle” (par exemple la médiane est une approximation) tandis que d’autres ne le sont pas du tout comme les fonctions de fenêtre (row_number, …).</p>
+<p>Prenons un exemple (totalement absurde) : on recherche, sur l’année 2018, toutes les courses dont le “rang” contient 59, qui ont commencé à la minute 59 et la seconde 59 et nous voulons extraire le “magic_number” qui supprime tous les chiffres autre que 5 et 9 du rang de la course :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>nyc_taxi_2018 <span class="ot">&lt;-</span> <span class="fu">open_dataset</span>(<span class="fu">file.path</span>(taxi_dir, <span class="st">"year=2018/"</span>))</span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>nyc_taxi_2018 <span class="sc">%&gt;%</span> <span class="fu">nrow</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 102797401</code></pre>
+</div>
+</div>
+<p>Ces données font plus de 100 millions de lignes, ce qui commence à être compliqué à traiter avec <code>dplyr</code>. Essayons avec <code>arrow</code> :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/row_number_2_5204a0cebfe909a48d2fc98fba055333">
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>nyc_taxi_2018 <span class="sc">%&gt;%</span></span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">trip_id =</span> <span class="fu">row_number</span>()) <span class="sc">|&gt;</span></span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(</span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a>    trip_id <span class="sc">|&gt;</span> <span class="fu">as.character</span>() <span class="sc">|&gt;</span> <span class="fu">str_detect</span>(<span class="st">"59"</span>),</span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">second</span>(pickup_datetime) <span class="sc">==</span> <span class="dv">59</span>,</span>
+<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">minute</span>(pickup_datetime) <span class="sc">==</span> <span class="dv">59</span></span>
+<span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb53-8"><a href="#cb53-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb53-9"><a href="#cb53-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">magic_number =</span> trip_id <span class="sc">|&gt;</span> </span>
+<span id="cb53-10"><a href="#cb53-10" aria-hidden="true" tabindex="-1"></a>      <span class="fu">as.character</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb53-11"><a href="#cb53-11" aria-hidden="true" tabindex="-1"></a>      <span class="fu">str_remove_all</span>(<span class="st">"[^59]"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb53-12"><a href="#cb53-12" aria-hidden="true" tabindex="-1"></a>      <span class="fu">as.integer</span>()</span>
+<span id="cb53-13"><a href="#cb53-13" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb53-14"><a href="#cb53-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(trip_id, magic_number, pickup_datetime) <span class="sc">|&gt;</span></span>
+<span id="cb53-15"><a href="#cb53-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-error">
+<pre><code>Error: Expression row_number() not supported in Arrow
+Call collect() first to pull data into R.</code></pre>
+</div>
+</div>
+<p><code>arrow</code>, très poliment, nous explique que <code>row_number()</code> n’est pas supporté, une solution dans ce cas là est d’utiliser les librairies <code>duckdb</code> et <code>dbplyr</code> :</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(duckdb)</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dbplyr)</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><code>arrow</code> et <code>duckdb</code> savent se parler très efficacement avec les fonctions <code>arrow::to_arrow()</code> et <code>arrow::to_duckdb()</code> qui ne passent pas les données proprement dite mais juste un pointeur sur les données <code>arrow</code> :</p>
+<div class="cell" data-hash="introduction-donnees-massives-arrow_cache/html/row_number_3_8524a44792e6a24125f3498c833971d9">
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>()</span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a>nyc_taxi_2018 <span class="sc">%&gt;%</span></span>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">to_duckdb</span>() <span class="sc">|&gt;</span>  </span>
+<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">window_order</span>(pickup_datetime) <span class="sc">|&gt;</span>  </span>
+<span id="cb56-5"><a href="#cb56-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">trip_id =</span> <span class="fu">row_number</span>()) <span class="sc">|&gt;</span></span>
+<span id="cb56-6"><a href="#cb56-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(</span>
+<span id="cb56-7"><a href="#cb56-7" aria-hidden="true" tabindex="-1"></a>    trip_id <span class="sc">|&gt;</span> <span class="fu">as.character</span>() <span class="sc">|&gt;</span> <span class="fu">str_detect</span>(<span class="st">"59"</span>),</span>
+<span id="cb56-8"><a href="#cb56-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">second</span>(pickup_datetime) <span class="sc">==</span> <span class="dv">59</span>,</span>
+<span id="cb56-9"><a href="#cb56-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">minute</span>(pickup_datetime) <span class="sc">==</span> <span class="dv">59</span></span>
+<span id="cb56-10"><a href="#cb56-10" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb56-11"><a href="#cb56-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb56-12"><a href="#cb56-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">magic_number =</span> trip_id <span class="sc">|&gt;</span> </span>
+<span id="cb56-13"><a href="#cb56-13" aria-hidden="true" tabindex="-1"></a>      <span class="fu">as.character</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb56-14"><a href="#cb56-14" aria-hidden="true" tabindex="-1"></a>      <span class="fu">str_remove_all</span>(<span class="st">"[^59]"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb56-15"><a href="#cb56-15" aria-hidden="true" tabindex="-1"></a>      <span class="fu">as.integer</span>()</span>
+<span id="cb56-16"><a href="#cb56-16" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb56-17"><a href="#cb56-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(trip_id, magic_number, pickup_datetime) <span class="sc">|&gt;</span></span>
+<span id="cb56-18"><a href="#cb56-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1,760 × 3
+   trip_id magic_number pickup_datetime    
+     &lt;dbl&gt;        &lt;int&gt; &lt;dttm&gt;             
+ 1  159065          595 2018-01-01 15:59:59
+ 2  159066           59 2018-01-01 15:59:59
+ 3  159067           59 2018-01-01 15:59:59
+ 4  159068           59 2018-01-01 15:59:59
+ 5  245759          559 2018-01-02 04:59:59
+ 6  446590           59 2018-01-02 20:59:59
+ 7  446591           59 2018-01-02 20:59:59
+ 8  446592           59 2018-01-02 20:59:59
+ 9  593933          599 2018-01-03 13:59:59
+10  593934          599 2018-01-03 13:59:59
+# ℹ 1,750 more rows</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copier vers le presse-papier" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>22.8 sec elapsed</code></pre>
+</div>
+</div>
+</section>
+<section id="quelques-conclusions-temporaires" class="level2">
+<h2 class="anchored" data-anchor-id="quelques-conclusions-temporaires">Quelques conclusions temporaires</h2>
+<section id="limitations-de-arrow" class="level3">
+<h3 class="anchored" data-anchor-id="limitations-de-arrow">Limitations de <code>arrow</code></h3>
+<p><code>arrow</code> est un outil de manipulation de données qui excelle dans les jointures, filtre, summmarize… Il n’est pas (forcément) adapté aux traitements statistiques tels que régression, tirages pondérés dans un échantillon…</p>
+</section>
+<section id="jointures-entre-des-grosses-tables" class="level3">
+<h3 class="anchored" data-anchor-id="jointures-entre-des-grosses-tables">jointures entre des grosses tables</h3>
+<p>Sur des « grosses » jointure <code>arrow</code> va essayer de charger en mémoire les données (et généralement planter). Nous verrons plus en profondeur dans une prochaine session l’utilisation de <code>duckdb</code> pour ces cas là.</p>
+</section>
+<section id="arrow-na-pas-forcément-le-même-comportement-que-dplyr" class="level3">
+<h3 class="anchored" data-anchor-id="arrow-na-pas-forcément-le-même-comportement-que-dplyr"><code>arrow</code> n’a pas forcément le même comportement que <code>dplyr</code></h3>
+<p>Et en particulier <code>arrow</code> est plus strict que le <code>tidyverse</code> standard :</p>
+<ul>
+<li>certains “petits trucs sales” en R ne passent pas (sommer des booleens)</li>
+<li>le typage est important, impossible de faire un <code>filter</code> avec un chiffre si le champs est une string.</li>
+<li>la recherche peut poser problème <code>dplyr</code> accepte les regexp comme [:punct:] (qui ne sont normalement pas valides), pour <code>arrow</code> il faudra utiliser [[:punct:]]</li>
+<li>surtout ne pas réutiliser r-base</li>
+</ul>
+<p>Quand vous convertissez un traitement de <code>dplyr</code> vers <code>arrow</code>, faites des tests :</p>
+<ol type="1">
+<li>sur quelques lignes et comparer les deux sorties.</li>
+<li>sur les agrégats entre les deux méthodes.</li>
+</ol>
+<p>Précautions : faire des tests sur les fonctions <code>lubridate</code> et <code>stringr</code> implémentée en arrow : essayer sur les ponctuations avec regexp (Attention au conversion de dates avec <code>lubridate</code> récupération d’un NA, calcul de max de date).</p>
+</section>
+<section id="une-librairie-encore-jeune" class="level3">
+<h3 class="anchored" data-anchor-id="une-librairie-encore-jeune">une librairie encore jeune</h3>
+<p><code>arrow</code> est une librairie encore jeune, une nouvelle version sort tous les 2/3 mois avec beaucoup d’évolutions et d’améliorations.</p>
+</section>
+</section>
+<section id="pour-approfondir-arrow" class="level2">
+<h2 class="anchored" data-anchor-id="pour-approfondir-arrow">Pour approfondir <code>arrow</code></h2>
+<ul>
+<li>L’excellent <a href="https://arrow-user2022.netlify.app/">tutorial donné à User2022</a> (dont je me suis largement inspiré)</li>
+<li>La <a href="https://arrow.apache.org/docs/r/">documentation officielle</a> de <code>arrow</code></li>
+<li>La <a href="https://arrow.apache.org/docs/r/reference/acero.html">liste complète des verbes <code>tidyverse</code></a> supportés par <code>arrow</code></li>
+</ul>
+</section>
+<section id="la-suite" class="level2">
+<h2 class="anchored" data-anchor-id="la-suite">La suite</h2>
+<p>prochaine séance dédiée à <code>duckdb</code></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copié");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copié");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
